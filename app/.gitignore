@@ -1,1 +1,9 @@
 /build
+/debug/
+/release/
+/src/main/java/cn/tabidachi/electro/ui/test/
+/src/main/java/cn/tabidachi/electro/ui/upload/
+/src/main/java/cn/tabidachi/electro/ui/auth/components/
+/src/main/java/cn/tabidachi/electro/ui/auth/AuthScreenPreview.kt
+/src/main/java/cn/tabidachi/electro/ui/chatgpt/
+/appCenter/
