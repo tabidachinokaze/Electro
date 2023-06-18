@@ -147,17 +147,24 @@ fun GroupDetailScreen(
                 Divider(thickness = 8.dp)
             }
             stickyHeader {
-                Surface(
-                    tonalElevation = 0.dp,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = stringResource(id = R.string.members),
-                        modifier = Modifier.padding(16.dp),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = stringResource(id = R.string.members),
+                            modifier = Modifier.padding(16.dp),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }, trailingContent = {
+                        if (viewState.isAdmin) {
+                            IconButton(onClick = {
+                                navigationActions.navigateToGroupAdmin(sid)
+                            }) {
+                                Icon(imageVector = Icons.Rounded.Edit, contentDescription = null)
+                            }
+                        }
+                    }
+                )
                 Divider()
             }
             items(viewState.users) {

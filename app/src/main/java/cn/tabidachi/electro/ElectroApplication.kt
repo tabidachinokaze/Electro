@@ -6,6 +6,7 @@ import coil.ImageLoader
 import coil.decode.GifDecoder
 import coil.decode.VideoFrameDecoder
 import coil.request.CachePolicy
+import com.amap.api.maps.MapsInitializer
 import com.microsoft.appcenter.AppCenter
 import com.microsoft.appcenter.analytics.Analytics
 import com.microsoft.appcenter.crashes.Crashes
@@ -32,5 +33,7 @@ class ElectroApplication : Application() {
             Crashes::class.java,
             Distribute::class.java
         )
+        MapsInitializer.updatePrivacyShow(this, true, true)
+        MapsInitializer.updatePrivacyAgree(this, true)
     }
 }

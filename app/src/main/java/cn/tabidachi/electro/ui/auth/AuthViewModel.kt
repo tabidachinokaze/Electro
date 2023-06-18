@@ -223,6 +223,10 @@ class AuthViewModel @Inject constructor(
         super.onCleared()
     }
 
+    fun languageMenuExpandedChange(value: Boolean) {
+        _viewState.update { it.copy(isLanguageMenuExpanded = value) }
+    }
+
     companion object {
         val TAG = AuthViewModel::class.simpleName
     }
@@ -237,7 +241,8 @@ data class AuthViewState(
     val passwordVisible: Boolean = false,
     val buttonText: String? = null,
     val buttonEnabled: Boolean = true,
-    val isAuthSuccess: Boolean = false
+    val isAuthSuccess: Boolean = false,
+    val isLanguageMenuExpanded: Boolean = false
 )
 
 enum class AuthMethod(@StringRes val id: Int) {

@@ -9,7 +9,7 @@ plugins {
 }
 
 def properties = new Properties()
-properties.load(project.rootProject.file("local.properties").newDataInputStream())
+properties.load(project.rootProject.file("electro.properties").newDataInputStream())
 
 android {
     namespace 'cn.tabidachi.electro'
@@ -19,8 +19,8 @@ android {
         applicationId "cn.tabidachi.electro"
         minSdk 28
         targetSdk 33
-        versionCode 4
-        versionName "1.0.4"
+        versionCode 5
+        versionName "1.0.5"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -50,7 +50,7 @@ android {
             buildConfigField("String", "MINIO_SECRET_KEY", properties.getProperty("MINIO_SECRET_KEY_REEALSE"))
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            signingConfig signingConfigs.debug
         }
         debug {
             buildConfigField("String", "APP_CENTER_SECRET", properties.getProperty("APP_CENTER_SECRET"))
@@ -72,7 +72,7 @@ android {
         buildConfig = true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion '1.4.4'
+        kotlinCompilerExtensionVersion '1.4.7'
     }
     packagingOptions {
         resources {
@@ -85,18 +85,24 @@ android {
             dimension "distribute"
         }
     }
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ['libs']
+        }
+    }
 }
 
 dependencies {
 
-    implementation 'androidx.core:core-ktx:1.10.0'
+    implementation 'androidx.core:core-ktx:1.10.1'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.1'
-    implementation 'androidx.activity:activity-compose:1.7.0'
+    implementation "androidx.lifecycle:lifecycle-runtime-compose:2.6.1"
+    implementation 'androidx.activity:activity-compose:1.7.2'
     implementation platform("androidx.compose:compose-bom:$compose_bom_version")
     implementation 'androidx.compose.ui:ui'
     implementation 'androidx.compose.ui:ui-graphics'
     implementation 'androidx.compose.ui:ui-tooling-preview'
-    implementation 'androidx.compose.material3:material3:1.1.0-beta02'
+    implementation 'androidx.compose.material3:material3:1.1.0'
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
@@ -105,16 +111,16 @@ dependencies {
     debugImplementation 'androidx.compose.ui:ui-tooling'
     debugImplementation 'androidx.compose.ui:ui-test-manifest'
 
-    implementation 'androidx.navigation:navigation-compose:2.5.3'
-    implementation 'com.google.accompanist:accompanist-systemuicontroller:0.30.0'
-    implementation 'com.google.accompanist:accompanist-navigation-animation:0.30.0'
-    implementation 'com.google.accompanist:accompanist-permissions:0.30.0'
+    implementation 'androidx.navigation:navigation-compose:2.6.0'
+    implementation 'com.google.accompanist:accompanist-systemuicontroller:0.30.1'
+    implementation 'com.google.accompanist:accompanist-navigation-animation:0.30.1'
+    implementation 'com.google.accompanist:accompanist-permissions:0.30.1'
     implementation 'androidx.compose.material:material-icons-extended'
 
     implementation 'androidx.datastore:datastore-preferences:1.0.0'
 
-    implementation 'com.google.dagger:hilt-android:2.45'
-    kapt 'com.google.dagger:hilt-compiler:2.45'
+    implementation 'com.google.dagger:hilt-android:2.46.1'
+    kapt 'com.google.dagger:hilt-compiler:2.46.1'
 //    ksp 'com.google.dagger:hilt-compiler:2.44.2'
     implementation 'androidx.hilt:hilt-navigation-compose:1.0.0'
 
@@ -122,8 +128,9 @@ dependencies {
     implementation "io.ktor:ktor-client-cio:$ktor_version"
     implementation "io.ktor:ktor-client-content-negotiation:$ktor_version"
     implementation "io.ktor:ktor-serialization-kotlinx-json:$ktor_version"
+    implementation "io.ktor:ktor-client-okhttp:$ktor_version"
 
-    implementation 'io.coil-kt:coil-bom:2.3.0'
+    implementation 'io.coil-kt:coil-bom:2.4.0'
     implementation 'io.coil-kt:coil-compose'
     implementation 'io.coil-kt:coil-gif'
     implementation 'io.coil-kt:coil-svg'
@@ -151,10 +158,6 @@ dependencies {
     implementation 'com.google.firebase:firebase-messaging-ktx'
     implementation 'com.google.firebase:firebase-inappmessaging-display-ktx'
 
-    def paging_version = "3.1.1"
-    implementation "androidx.paging:paging-runtime-ktx:$paging_version"
-    implementation "androidx.paging:paging-compose:1.0.0-alpha18"
-
     implementation 'stax:stax:1.2.0'
 
     def appCenterSdkVersion = '5.0.1'
@@ -163,6 +166,9 @@ dependencies {
     implementation "com.microsoft.appcenter:appcenter-distribute:${appCenterSdkVersion}"
 
     implementation("br.com.devsrsouza.compose.icons:tabler-icons:1.1.0")
+
+    implementation files('libs/AMap3DMap_9.6.0_AMapSearch_9.5.0_AMapLocation_6.2.0_20230116.jar')
+    implementation 'com.squareup.okhttp3:okhttp:4.11.0'
 
 }
 

@@ -144,7 +144,7 @@ fun GroupScreen(
             viewModel = viewModel,
             modifier = Modifier.padding(top = it.calculateTopPadding()),
             navigationActions = navigationActions,
-            isGroup = true,
+            isMultiSession = true,
             messageViewModel = messageViewModel,
         )
     }

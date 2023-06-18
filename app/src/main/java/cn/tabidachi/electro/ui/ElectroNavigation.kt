@@ -7,11 +7,18 @@ import cn.tabidachi.electro.ui.ElectroDestinationArgs.SID_ARG
 import cn.tabidachi.electro.ui.ElectroDestinationArgs.UID_ARG
 import cn.tabidachi.electro.ui.ElectroScreens.AUTH_SCREEN
 import cn.tabidachi.electro.ui.ElectroScreens.CALL_SCREEN
+import cn.tabidachi.electro.ui.ElectroScreens.CHANNEL_ADMIN_SCREEN
+import cn.tabidachi.electro.ui.ElectroScreens.CHANNEL_CREATE_SCREEN
+import cn.tabidachi.electro.ui.ElectroScreens.CHANNEL_DETAIL_SCREEN
+import cn.tabidachi.electro.ui.ElectroScreens.CHANNEL_EDIT_SCREEN
+import cn.tabidachi.electro.ui.ElectroScreens.CHANNEL_INVITE_SCREEN
+import cn.tabidachi.electro.ui.ElectroScreens.CHANNEL_SCREEN
 import cn.tabidachi.electro.ui.ElectroScreens.CHATGPT_SCREEN
 import cn.tabidachi.electro.ui.ElectroScreens.DIALOGS_SCREEN
 import cn.tabidachi.electro.ui.ElectroScreens.CHAT_SCREEN
 import cn.tabidachi.electro.ui.ElectroScreens.CONTACT_SCREEN
 import cn.tabidachi.electro.ui.ElectroScreens.CREATE_GROUP_SCREEN
+import cn.tabidachi.electro.ui.ElectroScreens.GROUP_ADMIN_SCREEN
 import cn.tabidachi.electro.ui.ElectroScreens.GROUP_DETAIL_SCREEN
 import cn.tabidachi.electro.ui.ElectroScreens.GROUP_EDIT_SCREEN
 import cn.tabidachi.electro.ui.ElectroScreens.GROUP_SCREEN
@@ -43,6 +50,13 @@ private object ElectroScreens {
     const val VIDEO_CALL_SCREEN = "video_call"
     const val CALL_SCREEN = "call"
     const val GROUP_EDIT_SCREEN = "group_edit"
+    const val GROUP_ADMIN_SCREEN = "group_admin"
+    const val CHANNEL_SCREEN = "channel"
+    const val CHANNEL_CREATE_SCREEN = "channel_create"
+    const val CHANNEL_ADMIN_SCREEN = "group_admin"
+    const val CHANNEL_DETAIL_SCREEN = "channel_detail"
+    const val CHANNEL_INVITE_SCREEN = "channel_invite"
+    const val CHANNEL_EDIT_SCREEN = "channel_edit"
 }
 
 object ElectroDestinationArgs {
@@ -69,6 +83,13 @@ object ElectroDestinations {
     const val PROFILE_ROUTE = PROFILE_SCREEN
     const val CHATGPT_ROUTE = CHATGPT_SCREEN
     const val SEARCH_ROUTE = SEARCH_SCREEN
+    const val GROUP_ADMIN_ROUTE = "$GROUP_ADMIN_SCREEN?$SID_ARG={$SID_ARG}"
+    const val CHANNEL_ROUTE = "$CHANNEL_SCREEN?$SID_ARG={$SID_ARG}"
+    const val CHANNEL_CREATE_ROUTE = CHANNEL_CREATE_SCREEN
+    const val CHANNEL_ADMIN_ROUTE = "$CHANNEL_ADMIN_SCREEN?$SID_ARG={$SID_ARG}"
+    const val CHANNEL_DETAIL_ROUTE = "$CHANNEL_DETAIL_SCREEN?$SID_ARG={$SID_ARG}"
+    const val CHANNEL_INVITE_ROUTE = "$CHANNEL_INVITE_SCREEN?$SID_ARG={$SID_ARG}"
+    const val CHANNEL_EDIT_ROUTE = "$CHANNEL_EDIT_SCREEN?$SID_ARG={$SID_ARG}"
 }
 
 class ElectroNavigationActions(
@@ -146,5 +167,37 @@ class ElectroNavigationActions(
             launchSingleTop = true
             restoreState = true
         }
+    }
+
+    fun navigateToChatGPT() {
+        navHostController.navigate("chatgpt")
+    }
+
+    fun navigateToGroupAdmin(sid: Long) {
+        navHostController.navigate("$GROUP_ADMIN_SCREEN?$SID_ARG=$sid")
+    }
+
+    fun navigateToChannel(sid: Long) {
+        navHostController.navigate("$CHANNEL_SCREEN?$SID_ARG=$sid")
+    }
+
+    fun navigateToCreateChannel() {
+        navHostController.navigate(CHANNEL_CREATE_SCREEN)
+    }
+
+    fun navigateToChannelAdmin(sid: Long) {
+        navHostController.navigate("$CHANNEL_ADMIN_SCREEN?$SID_ARG=$sid")
+    }
+
+    fun navigateToChannelDetail(sid: Long) {
+        navHostController.navigate("$CHANNEL_DETAIL_SCREEN?$SID_ARG=$sid")
+    }
+
+    fun navigateToChannelInvite(sid: Long) {
+        navHostController.navigate("$CHANNEL_INVITE_SCREEN?$SID_ARG=$sid")
+    }
+
+    fun navigateToChannelEdit(sid: Long) {
+        navHostController.navigate("$CHANNEL_EDIT_SCREEN?$SID_ARG=$sid")
     }
 }

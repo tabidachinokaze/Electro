@@ -151,7 +151,10 @@ fun SearchScreen(
                     SearchTab.CHANNEL -> when (val state = viewState.channels) {
                         SessionSearchState.Failure -> {}
                         SessionSearchState.None -> None()
-                        is SessionSearchState.Success -> Channels(state.value)
+                        is SessionSearchState.Success -> Channels(
+                            state.value,
+                            viewModel::onGroupJoinRequest
+                        )
                     }
 
                     SearchTab.USER -> when (val state = viewState.users) {
@@ -265,7 +268,7 @@ fun Groups(
                 modifier = Modifier
                     .navigationBarsPadding()
                     .padding(horizontal = 8.dp)
-                    .heightIn(min = 200.dp)
+                    .heightIn(min = 256.dp)
             ) {
                 Row(
                     modifier = Modifier,
@@ -372,35 +375,135 @@ fun Groups(
 }
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Channels(
-    channels: List<SessionSearch>
+    channels: List<SessionSearch>,
+    onJoinRequest: (Long) -> Unit
 ) {
     AnimatedVisibility(visible = channels.isEmpty()) {
         NotFound()
     }
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .imePadding()
-    ) {
-        items(channels) {
-            ListItem(
-                headlineContent = {
-                    Text(text = it.title ?: "")
-                }, leadingContent = {
-                    AsyncImage(
-                        model = it.image,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                    )
-                }
-            )
+    val scaffoldState = rememberBottomSheetScaffoldState()
+    val scope = rememberCoroutineScope()
+    val (current, function) = remember {
+        mutableStateOf<SessionSearch?>(null)
+    }
+    BackHandler(scaffoldState.bottomSheetState.isVisible) {
+        scope.launch {
+            scaffoldState.bottomSheetState.partialExpand()
         }
-        item {
-            Spacer(modifier = Modifier.navigationBarsPadding())
+    }
+    BottomSheetScaffold(
+        scaffoldState = scaffoldState,
+        sheetPeekHeight = 0.dp,
+        sheetContent = {
+            Column(
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .padding(horizontal = 8.dp)
+                    .heightIn(min = 256.dp)
+            ) {
+                Row(
+                    modifier = Modifier,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .size(72.dp)
+                            .clip(CircleShape)
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AsyncImage(model = current?.image, contentDescription = null)
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    text = current?.title ?: "",
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                            }, supportingContent = {
+                                Column {
+                                    Text(
+                                        text = stringResource(
+                                            id = R.string.group_id,
+                                            "${current?.sid ?: 0}"
+                                        )
+                                    )
+                                    Text(
+                                        text = stringResource(
+                                            id = R.string.members_count,
+                                            current?.count ?: 0
+                                        )
+                                    )
+                                }
+                            }
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            current?.sid?.let(onJoinRequest)
+                        }, contentPadding = PaddingValues(8.dp),
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Icon(imageVector = Icons.Rounded.Add, contentDescription = null)
+                        Text(text = stringResource(id = R.string.join))
+                    }
+                }
+                OutlinedTextField(
+                    value = current?.description ?: "",
+                    onValueChange = { },
+                    label = {
+                        Text(text = stringResource(id = R.string.channel_description))
+                    }, modifier = Modifier.fillMaxWidth(),
+                    readOnly = true
+                )
+            }
+        }
+    ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding()
+        ) {
+            items(channels) {
+                ListItem(
+                    headlineContent = {
+                        Text(text = it.title ?: "", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }, leadingContent = {
+                        AsyncImage(
+                            model = it.image,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                        )
+                    }, modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            scope.launch {
+                                function(it)
+                                scaffoldState.bottomSheetState.expand()
+                            }
+                        },
+                    supportingContent = {
+                        Text(text = it.description.takeIf { !it.isNullOrBlank() } ?: stringResource(
+                            id = R.string.group_id,
+                            "${it.sid}"
+                        ), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                )
+            }
+            item {
+                Spacer(modifier = Modifier.navigationBarsPadding())
+            }
         }
     }
 }

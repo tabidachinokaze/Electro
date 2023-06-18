@@ -2,6 +2,7 @@ package cn.tabidachi.electro.ui.common
 
 import android.Manifest
 import android.app.Application
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
@@ -9,8 +10,11 @@ import android.media.MediaMetadataRetriever
 import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
+import android.util.Pair
+import android.view.View
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.layout.Column
@@ -35,9 +39,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.view.ContentInfoCompat
+import androidx.core.view.OnReceiveContentListener
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import cn.tabidachi.electro.LocationActivity
 import cn.tabidachi.electro.R
 import cn.tabidachi.electro.data.Repository
 import cn.tabidachi.electro.data.database.entity.Message
@@ -48,7 +55,6 @@ import cn.tabidachi.electro.data.network.Ktor
 import cn.tabidachi.electro.ext.checkPermission
 import cn.tabidachi.electro.ext.longTimeFormat
 import cn.tabidachi.electro.ext.openableColumns
-import cn.tabidachi.electro.ext.toast
 import cn.tabidachi.electro.model.Playable
 import cn.tabidachi.electro.model.attachment.Attachment
 import cn.tabidachi.electro.model.attachment.AudioAttachment
@@ -65,6 +71,8 @@ import coil.executeBlocking
 import coil.imageLoader
 import coil.request.ImageRequest
 import coil.size.Scale
+import com.amap.api.maps.model.LatLng
+import com.amap.api.services.core.PoiItemV2
 import com.commit451.coiltransformations.BlurTransformation
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.ktor.http.ContentType
@@ -137,6 +145,19 @@ fun BottomMessageField(
         }
     )
     val context = LocalContext.current
+    val locationLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+        onResult = {
+            if (it.resultCode == 114514) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    viewModel.sendLocationMessage(
+                        sessionIdRequest,
+                        it.data?.extras?.getParcelable("attachment", LocationAttachment::class.java)
+                    )
+                }
+            }
+        }
+    )
     Surface(
         modifier = modifier,
         tonalElevation = 2.dp
@@ -181,9 +202,8 @@ fun BottomMessageField(
                         AttachmentType.Audio -> launcher.launch(ContentType.Audio.Any.toString())
                         AttachmentType.Video -> launcher.launch(ContentType.Video.Any.toString())
                         AttachmentType.Image -> launcher.launch(ContentType.Image.Any.toString())
-                        AttachmentType.Location -> {
-                            context.toast("功能未实现")
-                        }
+                        AttachmentType.Location ->
+                            locationLauncher.launch(Intent(context, LocationActivity::class.java))
 
                         AttachmentType.File -> launcher.launch(ContentType.Any.toString())
                     }
@@ -193,8 +213,7 @@ fun BottomMessageField(
                     .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
                 isRecording = viewState.isRecording,
                 onRecording = viewModel::onRecording,
-
-                )
+            )
         }
     }
 }
@@ -229,7 +248,7 @@ class MessageViewModel @Inject constructor(
     private val application: Application,
     private val repository: Repository,
     private val ktor: Ktor,
-) : ViewModel() {
+) : ViewModel(), OnReceiveContentListener {
     private val _viewState = MutableStateFlow(MessageViewState())
     val viewState = _viewState.asStateFlow()
     private var recorder: MediaRecorder? = null
@@ -263,7 +282,7 @@ class MessageViewModel @Inject constructor(
         } else {
             MediaRecorder()
         }.apply {
-            setAudioSource(MediaRecorder.AudioSource.MIC)
+            setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION)
             setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP)
             recordedFile = File(application.getExternalFilesDir(null), generateNonce())
             setOutputFile(recordedFile)
@@ -566,6 +585,55 @@ class MessageViewModel @Inject constructor(
         }
     }
 
+    fun sendLocationMessage(sessionIdRequest: suspend () -> Long?, poiItem: PoiItemV2) =
+        viewModelScope.launch {
+            val sid = sessionIdRequest() ?: return@launch
+            val attachment = LocationAttachment {
+                latitude = poiItem.latLonPoint.latitude
+                longitude = poiItem.latLonPoint.longitude
+                title = poiItem.title
+                city = poiItem.cityName
+                address = poiItem.adName
+                snippet = poiItem.snippet
+            }
+            repository.addMessageRequest(createAttachmentMessage(sid, null, attachment))
+        }
+
+    fun sendLocationMessage(sessionIdRequest: suspend () -> Long?, latLng: LatLng) =
+        viewModelScope.launch {
+            val sid = sessionIdRequest() ?: return@launch
+            val attachment = LocationAttachment {
+                latitude = latLng.latitude
+                longitude = latLng.longitude
+            }
+            repository.addMessageRequest(createAttachmentMessage(sid, null, attachment))
+        }
+
+    fun sendLocationMessage(
+        sessionIdRequest: suspend () -> Long?,
+        attachment: LocationAttachment?
+    ) = viewModelScope.launch {
+        val sid = sessionIdRequest() ?: return@launch
+        val attachment = attachment ?: return@launch
+        repository.addMessageRequest(createAttachmentMessage(sid, null, attachment))
+    }
+
+    override fun onReceiveContent(view: View, payload: ContentInfoCompat): ContentInfoCompat? {
+        println(payload)
+        val pair: Pair<ContentInfoCompat, ContentInfoCompat> = payload.partition {
+            it.uri != null
+        }
+        val uriContent = pair.first
+        val remaining = pair.second
+        if (uriContent != null) {
+            val clip = uriContent.clip
+            for (i in 0..clip.itemCount) {
+                val uri = clip.getItemAt(i)
+                println(uri)
+            }
+        }
+        return remaining
+    }
 }
 
 data class MessageViewState(

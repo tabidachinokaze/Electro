@@ -38,10 +38,13 @@ import cn.tabidachi.electro.model.attachment.VoiceAttachment
 import cn.tabidachi.electro.model.attachment.WebRTCAttachment
 import cn.tabidachi.electro.model.attachment.deserialize
 import cn.tabidachi.electro.model.attachment.serialize
+import cn.tabidachi.electro.model.request.ChannelUpdateRequest
 import cn.tabidachi.electro.model.request.GroupUpdateRequest
 import cn.tabidachi.electro.model.request.MessageRequest
 import cn.tabidachi.electro.model.request.MessageSyncRequest
 import cn.tabidachi.electro.model.request.UserUpdateRequest
+import cn.tabidachi.electro.model.response.ChannelRole
+import cn.tabidachi.electro.model.response.GroupRole
 import cn.tabidachi.electro.model.response.Response
 import io.ktor.client.request.get
 import io.ktor.client.request.head
@@ -833,8 +836,48 @@ class Repository(
         accountDao.delete(uid)
     }
 
-    suspend fun getGroupAdmin(sid: Long): Result<Response<List<User>>> {
-        return ktor.getGroupAdmin(sid)
+    suspend fun getGroupAdmins(sid: Long): Result<Response<List<GroupRole>>> {
+        return ktor.getGroupAdmins(sid)
+    }
+
+    suspend fun removeGroupAdmin(sid: Long, target: Long): Result<Response<Long>> {
+        return ktor.removeGroupAdmin(sid, target)
+    }
+
+    suspend fun addGroupAdmin(sid: Long, target: Long): Result<Response<GroupRole>> {
+        return ktor.addGroupAdmin(sid, target)
+    }
+
+    suspend fun removeGroupMember(sid: Long, target: Long): Result<Response<Long>> {
+        return ktor.removeGroupMember(sid, target)
+    }
+
+    suspend fun getGroupAdmin(sid: Long, target: Long): Result<Response<GroupRole>> {
+        return ktor.getGroupAdmin(sid, target)
+    }
+
+    suspend fun getChannelAdmins(sid: Long): Result<Response<List<ChannelRole>>> {
+        return ktor.getChannelAdmins(sid)
+    }
+
+    suspend fun removeChannelAdmin(sid: Long, target: Long): Result<Response<Long>> {
+        return ktor.removeChannelAdmin(sid, target)
+    }
+
+    suspend fun addChannelAdmin(sid: Long, target: Long): Result<Response<ChannelRole>> {
+        return ktor.addChannelAdmin(sid, target)
+    }
+
+    suspend fun removeChannelMember(sid: Long, target: Long): Result<Response<Long>> {
+        return ktor.removeChannelMember(sid, target)
+    }
+
+    suspend fun getChannelAdmin(sid: Long, target: Long): Result<Response<ChannelRole>> {
+        return ktor.getChannelAdmin(sid, target)
+    }
+
+    suspend fun updateChannelInfo(sid: Long, request: ChannelUpdateRequest): Result<Response<Long>> {
+        return ktor.updateChannelInfo(sid, request)
     }
 }
 

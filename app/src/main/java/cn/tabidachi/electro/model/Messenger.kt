@@ -60,13 +60,15 @@ abstract class Messenger(
     }
 
     fun listen(target: Long) {
-        val message = WebSocketMessage {
-            header = header {
-                type = MessageType.OnlineStatus.Listen.toString()
+        if (!listens.containsKey(target)) {
+            val message = WebSocketMessage {
+                header = header {
+                    type = MessageType.OnlineStatus.Listen.toString()
+                }
+                body = "$target".toByteArray()
             }
-            body = "$target".toByteArray()
+            send(message, true)
         }
-        send(message, true)
     }
 
     fun unlisten(target: Long) {

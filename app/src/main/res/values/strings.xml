@@ -1,5 +1,16 @@
 <resources>
     <string name="app_name">Electro</string>
+    <string name="dynamic">Dynamic</string>
+    <string name="pyro">Pyro</string>
+    <string name="hydro">Hydro</string>
+    <string name="anemo">Anemo</string>
+    <string name="electro">Electro</string>
+    <string name="dendro">Dendro</string>
+    <string name="cryo">Cryo</string>
+    <string name="geo">Geo</string>
+    <string name="dark_light_system">Follow system</string>
+    <string name="dark_light_on">Always on</string>
+    <string name="dark_light_off">Always off</string>
     <string name="login">Login</string>
     <string name="register">Register</string>
     <string name="captcha">Captcha</string>
@@ -43,6 +54,7 @@
     <string name="online">Online</string>
     <string name="offline">Offline</string>
     <string name="create_new_group">Create Group</string>
+    <string name="create_new_channel">Create Channel</string>
     <string name="group_name">Group Name</string>
     <string name="group_description">Group Description</string>
     <string name="leave_group">Leave Group</string>
@@ -81,8 +93,6 @@
     <string name="camera_description">For audio and video calls.</string>
     <string name="microphone_description">Used to record voice messages.</string>
     <string name="follow_system">Follow system</string>
-    <string name="always_off">Always off</string>
-    <string name="always_on">Always on</string>
     <string name="languages">Languages</string>
     <string name="english">English</string>
     <string name="chinese">Chinese</string>
@@ -92,11 +102,18 @@
     <string name="tako">Tako</string>
     <string name="strawberry">Strawberry</string>
     <string name="tealturqoise">Tealturqoise</string>
-    <string name="dynamic">Dynamic</string>
     <string name="no_update">No updates available</string>
     <string name="update_title">Version %s available!</string>
     <string name="about">About</string>
     <string name="version">Version</string>
     <string name="telegram" translatable="false">Telegram</string>
     <string name="github" translatable="false">Github</string>
+    <string name="save">Save</string>
+    <string name="share">Share</string>
+    <string name="title_activity_baidu_map">BaiduMapActivity</string>
+    <string name="location_descripiton">Used to get the location of the user.</string>
+    <string name="location_fine">Location</string>
+    <string name="channel_name">Channel Name</string>
+    <string name="channel_description">Channel Description</string>
+    <string name="leave_channel">Leave Channel</string>
 </resources>

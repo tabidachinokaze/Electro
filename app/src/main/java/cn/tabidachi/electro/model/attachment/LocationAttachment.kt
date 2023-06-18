@@ -11,16 +11,22 @@ import kotlinx.serialization.Serializable
 data class LocationAttachment(
     val latitude: Double,
     val longitude: Double,
-    val address: String
-) : Attachment
+    val title: String?,
+    val city: String?,
+    val address: String?,
+    val snippet: String?,
+) : Attachment, java.io.Serializable
 
 class LocationAttachmentDSL {
     var latitude: Double = 0.0
     var longitude: Double = 0.0
-    var address: String = ""
+    var title: String? = null
+    var city: String? = null
+    var address: String? = null
+    var snippet: String? = null
 
     fun build(): LocationAttachment {
-        return LocationAttachment(latitude, longitude, address)
+        return LocationAttachment(latitude, longitude, title, city, address, snippet)
     }
 }
 

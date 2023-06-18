@@ -73,7 +73,10 @@ fun PairScreen(
                             Text(text = targetUser?.username ?: "")
                         }, supportingContent = {
                             if (viewModel.online(target)) {
-                                Text(text = stringResource(id = R.string.online), color = MaterialTheme.colorScheme.primary)
+                                Text(
+                                    text = stringResource(id = R.string.online),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
                             } else {
                                 Text(text = stringResource(id = R.string.offline))
                             }

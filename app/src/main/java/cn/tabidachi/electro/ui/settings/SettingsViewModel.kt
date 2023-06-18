@@ -18,7 +18,8 @@ import cn.tabidachi.electro.data.network.MinIO
 import cn.tabidachi.electro.ext.MINIO
 import cn.tabidachi.electro.ext.dataStore
 import cn.tabidachi.electro.model.request.UserUpdateRequest
-import cn.tabidachi.electro.ui.theme.DayNight
+import cn.tabidachi.electro.ui.theme.DarkLight
+import cn.tabidachi.electro.ui.theme.Theme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -49,23 +50,23 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
     private val _viewState = MutableStateFlow(SettingViewState())
     val viewState = _viewState.asStateFlow()
-    var theme by mutableStateOf(Themes.Dynamic)
-    var dayNight by mutableStateOf(DayNight.SYSTEM)
+    var theme by mutableStateOf(Theme.Dynamic)
+    var darkLight by mutableStateOf(DarkLight.SYSTEM)
     var language by mutableStateOf(Language.SYSTEM)
 
     init {
         viewModelScope.launch {
             application.dataStore.data.map {
-                it[PreferenceConstant.Key.DAY_NIGHT]
+                it[PreferenceConstant.Key.DARK_LIGHT]
             }.filterNotNull().collect {
-                dayNight = DayNight.valueOf(it)
+                darkLight = DarkLight.valueOf(it)
             }
         }
         viewModelScope.launch {
             application.dataStore.data.map {
                 it[PreferenceConstant.Key.THEME]
             }.filterNotNull().collect {
-                theme = Themes.valueOf(it)
+                theme = Theme.valueOf(it)
             }
         }
     }
@@ -150,10 +151,10 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun onDayNightModeChange(dayNight: DayNight) {
+    fun onDayNightModeChange(darkLight: DarkLight) {
         viewModelScope.launch {
             application.dataStore.edit {
-                it[PreferenceConstant.Key.DAY_NIGHT] = dayNight.name
+                it[PreferenceConstant.Key.DARK_LIGHT] = darkLight.name
             }
         }
     }
@@ -162,7 +163,7 @@ class SettingsViewModel @Inject constructor(
         _viewState.update { it.copy(isDayNightMenuExpanded = value) }
     }
 
-    fun onThemeChange(theme: Themes) {
+    fun onThemeChange(theme: Theme) {
         viewModelScope.launch {
             application.dataStore.edit {
                 it[PreferenceConstant.Key.THEME] = theme.name

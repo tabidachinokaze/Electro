@@ -1,18 +1,19 @@
 package cn.tabidachi.electro.ui.group
 
 import android.graphics.Bitmap
+import android.util.Log
 import androidx.lifecycle.viewModelScope
 import cn.tabidachi.electro.data.Repository
 import cn.tabidachi.electro.data.database.entity.Dialog
-import cn.tabidachi.electro.data.database.entity.Message
 import cn.tabidachi.electro.data.database.entity.Session
 import cn.tabidachi.electro.data.database.entity.User
 import cn.tabidachi.electro.data.network.Ktor
 import cn.tabidachi.electro.data.network.MinIO
 import cn.tabidachi.electro.ext.MINIO
 import cn.tabidachi.electro.model.Messenger
-import cn.tabidachi.electro.model.attachment.Attachment
 import cn.tabidachi.electro.model.request.GroupUpdateRequest
+import cn.tabidachi.electro.model.response.GroupRole
+import cn.tabidachi.electro.model.response.GroupRoleType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -197,10 +198,14 @@ class GroupViewModel @Inject constructor(
 
     fun getAdmin(sid: Long) {
         viewModelScope.launch {
-            repository.getGroupAdmin(sid).onSuccess {
-                it.data?.let { admin ->
-                    val isAdmin = admin.any { it.uid == ktor.uid }
-                    _viewState.update { it.copy(admin = admin, isAdmin = isAdmin) }
+            repository.getGroupAdmins(sid).onSuccess {
+                it.data?.also { roles ->
+                    val isAdmin = roles.any { it.uid == ktor.uid }
+                    val owner = roles.firstOrNull { it.type == GroupRoleType.OWNER }
+                    _viewState.update { it.copy(roles = roles, isAdmin = isAdmin) }
+                    if (owner != null) {
+                        _viewState.update { it.copy(owner = owner.uid) }
+                    }
                 }
             }
         }
@@ -213,6 +218,58 @@ class GroupViewModel @Inject constructor(
             unlisten(it.uid)
         }
         super.onCleared()
+    }
+
+    fun removeAdmin(target: Long) {
+        viewModelScope.launch {
+            repository.removeGroupAdmin(sid.value, target).onSuccess {
+                if (it.status == HttpStatusCode.OK.value) it.data?.let { target ->
+                    _viewState.update {
+                        it.copy(
+                            roles = it.roles.toMutableList().apply {
+                                removeIf {
+                                    it.uid == target
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun addAdmin(target: Long) {
+        viewModelScope.launch {
+            repository.addGroupAdmin(sid.value, target).onSuccess {
+                if (it.status == HttpStatusCode.OK.value) it.data?.let { role ->
+                    _viewState.update {
+                        it.copy(
+                            roles = it.roles.toMutableList().apply {
+                                add(role)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun removeMember(target: Long) {
+        viewModelScope.launch {
+            repository.removeGroupMember(sid.value, target).onSuccess {
+                if (it.status == HttpStatusCode.OK.value) it.data?.let { target ->
+                    _viewState.update {
+                        it.copy(
+                            users = it.users.toMutableList().apply {
+                                removeIf {
+                                    it.uid == target
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -230,6 +287,7 @@ data class GroupViewState(
     val isExit: Boolean = false,
     val filter: String = "",
     val contacts: List<User> = emptyList(),
-    val admin: List<User> = emptyList(),
-    val isAdmin: Boolean = false
+    val roles: List<GroupRole> = emptyList(),
+    val isAdmin: Boolean = false,
+    val owner: Long = 0
 )

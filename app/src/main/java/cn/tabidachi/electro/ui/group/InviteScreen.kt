@@ -14,11 +14,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -74,7 +76,10 @@ fun InviteScreen(
                     viewModel.onFilterChange(it)
                 }, placeholder = {
                     Text(text = stringResource(id = R.string.search_contacts))
-                }, maxLines = 1
+                }, maxLines = 1,
+                leadingIcon = {
+                    Icon(imageVector = Icons.Rounded.Search, contentDescription = null)
+                }
             )
             LazyColumn(
                 modifier = Modifier.weight(1f)
@@ -88,7 +93,11 @@ fun InviteScreen(
                         headlineContent = {
                             Text(text = user.username)
                         }, supportingContent = {
-                            Text(text = stringResource(id = R.string.online_count, viewModel.online()))
+                            if (viewModel.online(user.uid)) {
+                                Text(text = stringResource(id = R.string.online), color = MaterialTheme.colorScheme.primary)
+                            } else {
+                                Text(text = stringResource(id = R.string.offline))
+                            }
                         }, leadingContent = {
                             Surface(
                                 modifier = Modifier.size(48.dp),

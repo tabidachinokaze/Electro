@@ -42,7 +42,7 @@ import androidx.datastore.preferences.core.edit
 import cn.tabidachi.electro.PreferenceConstant
 import cn.tabidachi.electro.data.database.entity.User
 import cn.tabidachi.electro.ext.dataStore
-import cn.tabidachi.electro.ui.theme.DayNight
+import cn.tabidachi.electro.ui.theme.DarkLight
 import coil.compose.AsyncImage
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
@@ -57,15 +57,15 @@ fun UserCard(
     onExpand: () -> Unit
 ) {
     val context = LocalContext.current
-    var dayNight by remember {
-        mutableStateOf(DayNight.SYSTEM)
+    var darkLight by remember {
+        mutableStateOf(DarkLight.SYSTEM)
     }
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         context.dataStore.data.map {
-            it[PreferenceConstant.Key.DAY_NIGHT]
+            it[PreferenceConstant.Key.DARK_LIGHT]
         }.filterNotNull().collect {
-            dayNight = DayNight.valueOf(it)
+            darkLight = DarkLight.valueOf(it)
         }
     }
     Surface(tonalElevation = 8.dp) {
@@ -89,20 +89,20 @@ fun UserCard(
                 }
                 CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
                     AnimatedContent(
-                        targetState = dayNight, modifier = Modifier
+                        targetState = darkLight, modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(8.dp), label = ""
                     ) {
                         val isNight = when (it) {
-                            DayNight.SYSTEM -> isSystemInDarkTheme()
-                            DayNight.DAY -> false
-                            DayNight.NIGHT -> true
+                            DarkLight.SYSTEM -> isSystemInDarkTheme()
+                            DarkLight.DARK -> true
+                            DarkLight.LIGHT -> false
                         }
                         IconButton(onClick = {
                             scope.launch {
                                 context.dataStore.edit {
-                                    it[PreferenceConstant.Key.DAY_NIGHT] =
-                                        if (isNight) DayNight.DAY.name else DayNight.NIGHT.name
+                                    it[PreferenceConstant.Key.DARK_LIGHT] =
+                                        if (isNight) DarkLight.LIGHT.name else DarkLight.DARK.name
                                 }
                             }
                         }) {

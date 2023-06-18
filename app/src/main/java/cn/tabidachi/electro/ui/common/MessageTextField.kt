@@ -11,13 +11,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.core.view.ViewCompat
 import cn.tabidachi.electro.R
+import io.ktor.http.ContentType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,6 +32,13 @@ fun MessageTextField(
     onAttachment: () -> Unit = {},
     onSend: () -> Unit = {},
 ) {
+    val view = LocalView.current
+    LaunchedEffect(key1 = view, block = {
+        ViewCompat.setOnReceiveContentListener(view, arrayOf(ContentType.Image.Any.toString())) { view, payload ->
+            println(payload)
+            payload
+        }
+    })
     BasicTextField(
         value = text,
         onValueChange = onTextValueChange,

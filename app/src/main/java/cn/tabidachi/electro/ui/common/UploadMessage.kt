@@ -46,6 +46,7 @@ import cn.tabidachi.electro.model.attachment.VoiceAttachment
 import cn.tabidachi.electro.model.attachment.WebRTCAttachment
 import cn.tabidachi.electro.ui.common.attachment.AudioAttachment
 import cn.tabidachi.electro.ui.common.attachment.FileAttachment
+import cn.tabidachi.electro.ui.common.attachment.LocationAttachment
 import cn.tabidachi.electro.ui.common.attachment.VoiceAttachment
 import coil.compose.AsyncImage
 import coil.decode.VideoFrameDecoder
@@ -178,12 +179,7 @@ fun UploadMessage(
             }
 
             is LocationAttachment -> {
-                Box(
-                    modifier = Modifier.sizeIn(
-                        minWidth = 160.dp,
-                        minHeight = 90.dp
-                    )
-                )
+                LocationAttachment(attachment = attachment)
             }
 
             is WebRTCAttachment -> {

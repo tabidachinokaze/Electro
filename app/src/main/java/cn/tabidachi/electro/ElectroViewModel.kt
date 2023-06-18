@@ -12,8 +12,8 @@ import cn.tabidachi.electro.data.network.Ktor
 import cn.tabidachi.electro.ext.dataStore
 import cn.tabidachi.electro.ui.ElectroDestinations
 import cn.tabidachi.electro.ui.auth.AuthViewModel
-import cn.tabidachi.electro.ui.settings.Themes
-import cn.tabidachi.electro.ui.theme.DayNight
+import cn.tabidachi.electro.ui.theme.DarkLight
+import cn.tabidachi.electro.ui.theme.Theme
 import com.google.firebase.messaging.FirebaseMessaging
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.ktor.client.request.post
@@ -36,8 +36,8 @@ class ElectroViewModel @Inject constructor(
 ) : ViewModel() {
     private val _viewState = MutableStateFlow(ElectroViewState())
     val viewState = _viewState.asStateFlow()
-    var dayNight by mutableStateOf(DayNight.SYSTEM)
-    var theme: Themes by mutableStateOf(Themes.Dynamic)
+    var darkLight by mutableStateOf(DarkLight.SYSTEM)
+    var theme: Theme by mutableStateOf(Theme.Dynamic)
 
     init {
         val account = application.dataStore.data.map {
@@ -79,16 +79,16 @@ class ElectroViewModel @Inject constructor(
         }
         viewModelScope.launch {
             application.dataStore.data.map {
-                it[PreferenceConstant.Key.DAY_NIGHT]
+                it[PreferenceConstant.Key.DARK_LIGHT]
             }.filterNotNull().collect {
-                dayNight = DayNight.valueOf(it)
+                darkLight = DarkLight.valueOf(it)
             }
         }
         viewModelScope.launch {
             application.dataStore.data.map {
                 it[PreferenceConstant.Key.THEME]
             }.filterNotNull().collect {
-                theme = Themes.valueOf(it)
+                theme = Theme.valueOf(it)
             }
         }
     }

@@ -6,8 +6,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,6 +22,7 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.pullrefreshx.PullRefreshIndicator
 import androidx.compose.material.pullrefreshx.pullRefresh
 import androidx.compose.material.pullrefreshx.rememberPullRefreshState
+import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -54,7 +57,8 @@ fun MessageColumn(
     viewModel: Messenger,
     messageViewModel: MessageViewModel,
     navigationActions: ElectroNavigationActions,
-    isGroup: Boolean = false,
+    isMultiSession: Boolean = false,
+    canSendMessage: Boolean = true,
 ) {
     val refreshState = rememberPullRefreshState(
         refreshing = viewModel.isRefresh,
@@ -113,7 +117,7 @@ fun MessageColumn(
                         mutableStateOf(false)
                     }
                     Row(verticalAlignment = Alignment.Bottom) {
-                        if (item.type == BubbleType.Incoming && isGroup) {
+                        if (item.type == BubbleType.Incoming && isMultiSession) {
                             Surface(
                                 border = BorderStroke(
                                     1.dp,
@@ -230,8 +234,7 @@ fun MessageColumn(
                 }
             }
         }
-
-        BottomMessageField(
+        if (canSendMessage) BottomMessageField(
             sessionIdRequest = viewModel::getSessionId,
             replyRequest = viewModel::getReplyId,
             onSuccess = viewModel::onMessageSendSuccess,
@@ -252,8 +255,8 @@ fun MessageColumn(
                 }
             },
             modifier = Modifier.imePadding(),
-            viewModel = messageViewModel
-        )
+            viewModel = messageViewModel,
+        ) else Spacer(modifier = Modifier.navigationBarsPadding())
     }
 }
 

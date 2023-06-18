@@ -30,6 +30,7 @@ fun SimpleTextField(
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     shape: Shape = TextFieldDefaults.filledShape,
     isError: Boolean = false,
+    leadingIcon: @Composable (() -> Unit)? = null,
 ) {
     BasicTextField(
         value = value,
@@ -75,7 +76,8 @@ fun SimpleTextField(
                             colors = TextFieldDefaults.outlinedTextFieldColors()
                         )
                     }
-                }, shape = shape
+                }, shape = shape,
+                leadingIcon = leadingIcon
             )
         },
         modifier = modifier.fillMaxWidth()

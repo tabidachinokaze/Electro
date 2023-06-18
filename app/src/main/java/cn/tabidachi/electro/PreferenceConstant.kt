@@ -10,7 +10,7 @@ object PreferenceConstant {
     const val THEME = "theme"
     object Key {
         val THEME = stringPreferencesKey(PreferenceConstant.THEME)
-        val DAY_NIGHT = stringPreferencesKey(PreferenceConstant.DAY_NIGHT)
+        val DARK_LIGHT = stringPreferencesKey("dark_light")
         val TOKEN = stringPreferencesKey(PreferenceConstant.TOKEN)
         val UID = longPreferencesKey(PreferenceConstant.UID)
     }

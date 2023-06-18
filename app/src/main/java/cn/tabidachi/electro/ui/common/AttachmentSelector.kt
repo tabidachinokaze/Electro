@@ -13,6 +13,7 @@ import androidx.compose.material.icons.rounded.Done
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -25,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 
@@ -64,6 +66,9 @@ fun AttachmentSelector(
                 }
             }
         }
+        if (isProcessing) {
+            CircularProgressIndicator(strokeWidth = 3.dp, strokeCap = StrokeCap.Round, modifier = Modifier.size(24.dp))
+        } else
         if (isEditing) {
             FilledIconButton(onClick = onEdited) {
                 Icon(imageVector = Icons.Rounded.Done, contentDescription = null)

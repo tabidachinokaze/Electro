@@ -51,7 +51,7 @@ data class Message(
     override fun identification() = "message.$mid"
 
     @Ignore
-    private val deserialize: Attachment? = Attachment.deserialize(type, attachment)
+    val deserialize: Attachment? = Attachment.deserialize(type, attachment)
 
     @Composable
     override fun description(): String = when (deserialize) {

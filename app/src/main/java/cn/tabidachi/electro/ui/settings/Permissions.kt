@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Videocam
@@ -87,6 +88,12 @@ enum class Permissions(
         description = R.string.microphone_description,
         permission = Manifest.permission.RECORD_AUDIO
     ),
+    LOCATION(
+        icon = Icons.Rounded.LocationOn,
+        title = R.string.location_fine,
+        description = R.string.location_descripiton,
+        permission = Manifest.permission.ACCESS_FINE_LOCATION
+    )
 }
 
 @Composable

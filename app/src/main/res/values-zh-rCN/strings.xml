@@ -1,5 +1,16 @@
 <resources>
     <string name="app_name">Electro</string>
+    <string name="dynamic">动态</string>
+    <string name="pyro">火</string>
+    <string name="hydro">水</string>
+    <string name="anemo">风</string>
+    <string name="electro">雷</string>
+    <string name="dendro">草</string>
+    <string name="cryo">冰</string>
+    <string name="geo">岩</string>
+    <string name="dark_light_system">跟随系统</string>
+    <string name="dark_light_on">总是开启</string>
+    <string name="dark_light_off">总是关闭</string>
     <string name="login">登录</string>
     <string name="register">注册</string>
     <string name="captcha">验证码</string>
@@ -43,6 +54,7 @@
     <string name="online">在线</string>
     <string name="offline">离线</string>
     <string name="create_new_group">新建群组</string>
+    <string name="create_new_channel">新建频道</string>
     <string name="group_name">群组名称</string>
     <string name="group_description">群组描述</string>
     <string name="leave_group">退出群组</string>
@@ -81,8 +93,6 @@
     <string name="camera_description">用于音视频通话</string>
     <string name="microphone_description">用于录制语音消息</string>
     <string name="follow_system">跟随系统</string>
-    <string name="always_off">总是关闭</string>
-    <string name="always_on">总是开启</string>
     <string name="languages">语言</string>
     <string name="english">英语</string>
     <string name="chinese">中文</string>
@@ -92,9 +102,15 @@
     <string name="tako">薰衣草</string>
     <string name="strawberry">草莓巧克力</string>
     <string name="tealturqoise">浪潮</string>
-    <string name="dynamic">动态配色</string>
     <string name="no_update">暂无更新</string>
     <string name="update_title">新版本 %s</string>
     <string name="about">关于</string>
     <string name="version">版本</string>
+    <string name="save">保存</string>
+    <string name="share">Share</string>
+    <string name="location_descripiton">用于获取用户的定位</string>
+    <string name="location_fine">位置信息</string>
+    <string name="channel_name">频道名称</string>
+    <string name="channel_description">频道描述</string>
+    <string name="leave_channel">退出频道</string>
 </resources>

@@ -15,13 +15,17 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
@@ -49,9 +53,6 @@ fun AuthScreen(
     navigationActions: ElectroNavigationActions,
     navHostController: NavHostController
 ) {
-    var isExpended by remember {
-        mutableStateOf(false)
-    }
     val viewState by authViewModel.viewState.collectAsState()
     val hostState = authViewModel.hostState
 
@@ -68,27 +69,25 @@ fun AuthScreen(
                             Text(text = stringResource(id = it.id))
                         }
                     }
-                    /*
                     IconButton(onClick = {
-                        isExpended = true
+                        authViewModel.languageMenuExpandedChange(true)
                     }) {
                         Icon(imageVector = Icons.Default.Language, contentDescription = "Language")
                     }
-                    DropdownMenu(expanded = isExpended, onDismissRequest = {
-                        isExpended = false
+                    DropdownMenu(expanded = viewState.isLanguageMenuExpanded, onDismissRequest = {
+                        authViewModel.languageMenuExpandedChange(false)
                     }) {
                         DropdownMenuItem(text = {
-                            Text(text = "中文")
+                            Text(text = stringResource(id = R.string.chinese))
                         }, onClick = {
-                            isExpended = false
+                            authViewModel.languageMenuExpandedChange(false)
                         })
                         DropdownMenuItem(text = {
-                            Text(text = "English")
+                            Text(text = stringResource(id = R.string.english))
                         }, onClick = {
-                            isExpended = false
+                            authViewModel.languageMenuExpandedChange(false)
                         })
                     }
-                    */
                 }, scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
             )
         }, floatingActionButton = {
