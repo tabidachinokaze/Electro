@@ -175,10 +175,10 @@ class Ktor(
                     .header("Authorization", "Bearer $token")
                     .build()
                 okHttpClient.newCall(request).execute()
-            client.get(url) {
-                contentType(ContentType.Application.Json)
-                setBody(Any())
-            }
+//            client.get(url) {
+//                contentType(ContentType.Application.Json)
+//                setBody(Any())
+//            }
             }.onFailure {
                 Log.e(TAG, "get: $url", it)
             }.mapCatching {

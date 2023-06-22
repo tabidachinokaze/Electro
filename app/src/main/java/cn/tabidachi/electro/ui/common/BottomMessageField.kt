@@ -14,7 +14,6 @@ import android.util.Pair
 import android.view.View
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.layout.Column
@@ -42,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.ContentInfoCompat
 import androidx.core.view.OnReceiveContentListener
 import androidx.hilt.navigation.compose.hiltViewModel
+import cn.tabidachi.electro.coil.BlurTransformation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cn.tabidachi.electro.LocationActivity
@@ -73,7 +73,6 @@ import coil.request.ImageRequest
 import coil.size.Scale
 import com.amap.api.maps.model.LatLng
 import com.amap.api.services.core.PoiItemV2
-import com.commit451.coiltransformations.BlurTransformation
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.ktor.http.ContentType
 import io.ktor.util.generateNonce
@@ -462,9 +461,14 @@ class MessageViewModel @Inject constructor(
     private fun blur(bitmap: Bitmap): Bitmap {
         val request = ImageRequest.Builder(application)
             .data(bitmap)
-            .transformations(BlurTransformation(application, 25f))
+            .transformations(BlurTransformation(25f, 1f))
             .build()
-        return (application.imageLoader.executeBlocking(request).drawable as BitmapDrawable).bitmap
+        return (application.imageLoader.executeBlocking(request).drawable.also {
+            println("Drawable $it")
+        } as BitmapDrawable).bitmap.copy(
+            Bitmap.Config.ARGB_8888,
+            true
+        )
     }
 
     private fun quality(bitmap: Bitmap): ByteArray {

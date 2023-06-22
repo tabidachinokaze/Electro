@@ -53,7 +53,7 @@ private object ElectroScreens {
     const val GROUP_ADMIN_SCREEN = "group_admin"
     const val CHANNEL_SCREEN = "channel"
     const val CHANNEL_CREATE_SCREEN = "channel_create"
-    const val CHANNEL_ADMIN_SCREEN = "group_admin"
+    const val CHANNEL_ADMIN_SCREEN = "channel_admin"
     const val CHANNEL_DETAIL_SCREEN = "channel_detail"
     const val CHANNEL_INVITE_SCREEN = "channel_invite"
     const val CHANNEL_EDIT_SCREEN = "channel_edit"
