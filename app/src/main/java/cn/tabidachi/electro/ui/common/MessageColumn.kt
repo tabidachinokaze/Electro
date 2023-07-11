@@ -22,7 +22,6 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.pullrefreshx.PullRefreshIndicator
 import androidx.compose.material.pullrefreshx.pullRefresh
 import androidx.compose.material.pullrefreshx.rememberPullRefreshState
-import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -45,8 +44,12 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import cn.tabidachi.electro.model.DownloadMessageItem
 import cn.tabidachi.electro.model.Messenger
 import cn.tabidachi.electro.ui.ElectroNavigationActions
+import cn.tabidachi.electro.ui.component.PopupMenu
+import cn.tabidachi.electro.ui.component.popupMenuAnchor
+import cn.tabidachi.electro.ui.component.rememberPopupState
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 
@@ -72,6 +75,10 @@ fun MessageColumn(
     val scope = rememberCoroutineScope()
     val firstVisibleItem by remember { derivedStateOf { listState.firstVisibleItemIndex } }
     val clipboardManager = LocalClipboardManager.current
+    var popupItem by remember {
+        mutableStateOf<DownloadMessageItem?>(null)
+    }
+    val popupState = rememberPopupState()
     Column(modifier = modifier) {
         Box(
             modifier = Modifier
@@ -113,10 +120,10 @@ fun MessageColumn(
                     }
                 }
                 items(messages) { item ->
-                    val (messageMenu, onMenuChange) = remember {
-                        mutableStateOf(false)
-                    }
-                    Row(verticalAlignment = Alignment.Bottom) {
+                    Row(
+                        verticalAlignment = Alignment.Bottom,
+                        modifier = Modifier.popupMenuAnchor(popupState)
+                    ) {
                         if (item.type == BubbleType.Incoming && isMultiSession) {
                             Surface(
                                 border = BorderStroke(
@@ -142,12 +149,12 @@ fun MessageColumn(
                         }
                         MessageBubble(
                             isIncoming = item.type == BubbleType.Incoming,
-
                             modifier = Modifier.clickable(
                                 interactionSource = item.interactionSource,
                                 indication = LocalIndication.current,
                                 onClick = {
-                                    onMenuChange(true)
+                                    popupState.show()
+                                    popupItem = item
                                 }
                             )
                         ) {
@@ -175,39 +182,8 @@ fun MessageColumn(
                                     }
                                 }
                             )
-                            MessageDropdownMenu(
-                                expanded = messageMenu,
-                                menus = item.menus,
-                                onDismissRequest = onMenuChange,
-                                onMenuClick = {
-                                    when (it) {
-                                        MessageMenu.Reply -> {
-                                            viewModel.onReply(item.message.mid)
-                                        }
-
-                                        MessageMenu.Copy -> {
-                                            when {
-                                                !item.message.text.isNullOrBlank() -> {
-                                                    AnnotatedString(item.message.text).let {
-                                                        clipboardManager.setText(it)
-                                                    }
-                                                }
-
-                                                else -> {}
-                                            }
-                                        }
-
-                                        MessageMenu.Forward -> {}
-                                        MessageMenu.Edit -> {}
-                                        MessageMenu.Delete -> {
-                                            viewModel.deleteMessage(item.message.mid)
-                                        }
-                                    }
-                                }
-                            )
                         }
                     }
-
                 }
             }
             PullRefreshIndicator(
@@ -257,6 +233,52 @@ fun MessageColumn(
             modifier = Modifier.imePadding(),
             viewModel = messageViewModel,
         ) else Spacer(modifier = Modifier.navigationBarsPadding())
+    }
+    PopupMenu(
+        state = popupState,
+        onDismissRequest = {
+            popupState.hide()
+        }
+    ) {
+        popupItem?.let { popupItem ->
+            popupItem.menus.forEach {
+                DropdownMenuItem(
+                    text = {
+                        Text(text = stringResource(id = it.text))
+                    }, leadingIcon = {
+                        Icon(
+                            imageVector = it.icon,
+                            contentDescription = null
+                        )
+                    }, onClick = {
+                        popupState.hide()
+                        when (it) {
+                            MessageMenu.Reply -> {
+                                viewModel.onReply(popupItem.message.mid)
+                            }
+
+                            MessageMenu.Copy -> {
+                                when {
+                                    !popupItem.message.text.isNullOrBlank() -> {
+                                        AnnotatedString(popupItem.message.text).let {
+                                            clipboardManager.setText(it)
+                                        }
+                                    }
+
+                                    else -> {}
+                                }
+                            }
+
+                            MessageMenu.Forward -> {}
+                            MessageMenu.Edit -> {}
+                            MessageMenu.Delete -> {
+                                viewModel.deleteMessage(popupItem.message.mid)
+                            }
+                        }
+                    }
+                )
+            }
+        }
     }
 }
 
