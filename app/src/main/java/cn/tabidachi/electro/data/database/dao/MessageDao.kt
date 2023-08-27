@@ -1,6 +1,5 @@
 package cn.tabidachi.electro.data.database.dao
 
-import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
@@ -31,6 +30,4 @@ interface MessageDao {
     fun delete(mid: Long)
     @Query("select * from message where sid = :sid ORDER BY createTime DESC LIMIT :size")
     fun messages(sid: Long, size: Int): List<Message>
-    @Query("select * from message where sid = :sid ORDER BY createTime DESC")
-    fun messagePagingSource(sid: Long): PagingSource<Int, Message>
 }
