@@ -6,6 +6,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -21,6 +22,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PageSize
+import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -72,7 +75,12 @@ import kotlinx.coroutines.launch
 fun SearchScreen(
     navigationActions: ElectroNavigationActions
 ) {
-    val pagerState = rememberPagerState()
+    val pagerState = rememberPagerState(
+        initialPage = 0,
+        initialPageOffsetFraction = 0f
+    ) {
+        SearchTab.entries.size
+    }
     val scope = rememberCoroutineScope()
     val viewModel: SearchViewModel = hiltViewModel()
     val viewState by viewModel.viewState.collectAsState()
@@ -117,7 +125,7 @@ fun SearchScreen(
                     )
                 }
             ) {
-                SearchTab.values().forEachIndexed { index, searchTab ->
+                SearchTab.entries.forEachIndexed { index, searchTab ->
                     Tab(
                         selected = pagerState.currentPage == index,
                         onClick = {
@@ -131,39 +139,54 @@ fun SearchScreen(
                     )
                 }
             }
-            HorizontalPager(pageCount = SearchTab.values().size, state = pagerState) {
-                when (SearchTab.values()[it]) {
-                    SearchTab.DIALOG -> when (val state = viewState.dialogs) {
-                        DialogSearchState.Failure -> {}
-                        DialogSearchState.None -> None()
-                        is DialogSearchState.Success -> Dialogs(state.value, navigationActions)
-                    }
+            HorizontalPager(
+                modifier = Modifier,
+                state = pagerState,
+                pageSpacing = 0.dp,
+                userScrollEnabled = true,
+                reverseLayout = false,
+                contentPadding = PaddingValues(0.dp),
+                beyondBoundsPageCount = 0,
+                pageSize = PageSize.Fill,
+                flingBehavior = PagerDefaults.flingBehavior(state = pagerState),
+                key = null,
+                pageNestedScrollConnection = PagerDefaults.pageNestedScrollConnection(
+                    Orientation.Horizontal
+                ),
+                pageContent = {
+                    when (SearchTab.entries[it]) {
+                        SearchTab.DIALOG -> when (val state = viewState.dialogs) {
+                            DialogSearchState.Failure -> {}
+                            DialogSearchState.None -> None()
+                            is DialogSearchState.Success -> Dialogs(state.value, navigationActions)
+                        }
 
-                    SearchTab.GROUP -> when (val state = viewState.groups) {
-                        SessionSearchState.Failure -> {}
-                        SessionSearchState.None -> None()
-                        is SessionSearchState.Success -> Groups(
-                            state.value,
-                            viewModel::onGroupJoinRequest
-                        )
-                    }
+                        SearchTab.GROUP -> when (val state = viewState.groups) {
+                            SessionSearchState.Failure -> {}
+                            SessionSearchState.None -> None()
+                            is SessionSearchState.Success -> Groups(
+                                state.value,
+                                viewModel::onGroupJoinRequest
+                            )
+                        }
 
-                    SearchTab.CHANNEL -> when (val state = viewState.channels) {
-                        SessionSearchState.Failure -> {}
-                        SessionSearchState.None -> None()
-                        is SessionSearchState.Success -> Channels(
-                            state.value,
-                            viewModel::onGroupJoinRequest
-                        )
-                    }
+                        SearchTab.CHANNEL -> when (val state = viewState.channels) {
+                            SessionSearchState.Failure -> {}
+                            SessionSearchState.None -> None()
+                            is SessionSearchState.Success -> Channels(
+                                state.value,
+                                viewModel::onGroupJoinRequest
+                            )
+                        }
 
-                    SearchTab.USER -> when (val state = viewState.users) {
-                        UserSearchState.Failure -> {}
-                        UserSearchState.None -> None()
-                        is UserSearchState.Success -> Users(state.value, navigationActions)
+                        SearchTab.USER -> when (val state = viewState.users) {
+                            UserSearchState.Failure -> {}
+                            UserSearchState.None -> None()
+                            is UserSearchState.Success -> Users(state.value, navigationActions)
+                        }
                     }
                 }
-            }
+            )
         }
     }
 }

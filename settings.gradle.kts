@@ -10,13 +10,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven {
-            url 'https://dl.bintray.com/google/webrtc/'
-        }
-        jcenter()
-        maven { url "https://jitpack.io" }
-        maven { url 'https://mirrors.tencent.com/nexus/repository/maven-public/' }
+        maven("https://dl.bintray.com/google/webrtc/")
+        maven("https://jitpack.io")
+        maven("https://mirrors.tencent.com/nexus/repository/maven-public/")
     }
 }
 rootProject.name = "Electro"
-include ':app'
+include(":app")
