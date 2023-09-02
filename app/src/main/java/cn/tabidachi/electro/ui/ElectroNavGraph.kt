@@ -1,7 +1,6 @@
 package cn.tabidachi.electro.ui
 
 import android.annotation.SuppressLint
-import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -14,6 +13,9 @@ import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import cn.tabidachi.electro.ElectroViewModel
 import cn.tabidachi.electro.ui.auth.AuthScreen
@@ -23,7 +25,6 @@ import cn.tabidachi.electro.ui.channel.ChannelDetailScreen
 import cn.tabidachi.electro.ui.channel.ChannelEditScreen
 import cn.tabidachi.electro.ui.channel.ChannelInviteScreen
 import cn.tabidachi.electro.ui.channel.ChannelScreen
-import cn.tabidachi.electro.ui.map.DragDropSelectPointScreen
 import cn.tabidachi.electro.ui.chatgpt.ChatGPTScreen
 import cn.tabidachi.electro.ui.contact.ContactScreen
 import cn.tabidachi.electro.ui.group.CreateGroupScreen
@@ -32,21 +33,18 @@ import cn.tabidachi.electro.ui.group.GroupAdminScreen
 import cn.tabidachi.electro.ui.group.GroupDetailScreen
 import cn.tabidachi.electro.ui.group.GroupScreen
 import cn.tabidachi.electro.ui.group.InviteScreen
+import cn.tabidachi.electro.ui.map.DragDropSelectPointScreen
 import cn.tabidachi.electro.ui.pair.PairScreen
 import cn.tabidachi.electro.ui.profile.ProfileScreen
 import cn.tabidachi.electro.ui.search.SearchScreen
 import cn.tabidachi.electro.ui.sessions.SessionsScreen
 import cn.tabidachi.electro.ui.settings.SettingsScreen
-import com.google.accompanist.navigation.animation.AnimatedNavHost
-import com.google.accompanist.navigation.animation.composable
-import com.google.accompanist.navigation.animation.rememberAnimatedNavController
 
 @SuppressLint("UnrememberedGetBackStackEntry")
-@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun ElectroNavGraph(
     modifier: Modifier = Modifier,
-    navHostController: NavHostController = rememberAnimatedNavController(),
+    navHostController: NavHostController = rememberNavController(),
     startDestination: String = ElectroDestinations.SPLASH_ROUTE,
     navigationActions: ElectroNavigationActions = remember(navHostController) {
         ElectroNavigationActions(navHostController)
@@ -54,7 +52,7 @@ fun ElectroNavGraph(
 ) {
     val electroViewModel: ElectroViewModel = hiltViewModel()
     val viewState by electroViewModel.viewState.collectAsState()
-    AnimatedNavHost(
+    NavHost(
         navController = navHostController,
         startDestination = viewState.startDestination,
 //        startDestination = "map",
