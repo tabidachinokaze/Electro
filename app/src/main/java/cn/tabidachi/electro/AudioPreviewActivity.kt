@@ -41,7 +41,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cn.tabidachi.electro.ext.longTimeFormat
 import cn.tabidachi.electro.ui.theme.ElectroTheme
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job

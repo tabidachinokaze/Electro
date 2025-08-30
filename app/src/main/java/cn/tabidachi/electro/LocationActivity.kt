@@ -2,9 +2,9 @@ package cn.tabidachi.electro
 
 import android.content.Intent
 import android.os.Bundle
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
@@ -15,7 +15,7 @@ import cn.tabidachi.electro.ui.theme.ElectroTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
-class LocationActivity : AppCompatActivity() {
+class LocationActivity : ComponentActivity() {
     private val electroViewModel: ElectroViewModel by viewModels()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

@@ -129,7 +129,7 @@ class DownloadMessageItem(
                                     downloading = false
                                 }
                             ) { sent, length ->
-                                progress = sent.toFloat() / length.toFloat()
+                                length?.let { progress = sent.toFloat() / it.toFloat() }
                             }
                         }
 

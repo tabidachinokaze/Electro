@@ -42,7 +42,7 @@ fun SimpleTextField(
         visualTransformation = visualTransformation,
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         decorationBox = {
-            TextFieldDefaults.TextFieldDecorationBox(
+            TextFieldDefaults.DecorationBox(
                 value = value,
                 innerTextField = it,
                 enabled = true,
@@ -69,11 +69,11 @@ fun SimpleTextField(
                     */
 
                     if (isError) {
-                        TextFieldDefaults.OutlinedBorderContainerBox(
+                        TextFieldDefaults.Container(
                             enabled = true,
                             isError = isError,
                             interactionSource = interactionSource,
-                            colors = TextFieldDefaults.outlinedTextFieldColors()
+                            colors = TextFieldDefaults.colors()
                         )
                     }
                 }, shape = shape,

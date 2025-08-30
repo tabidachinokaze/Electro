@@ -1,6 +1,8 @@
 package cn.tabidachi.electro.ext
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -86,5 +88,16 @@ fun Context.checkPermission(permission: String): Boolean {
         false
     } else {
         true
+    }
+}
+
+tailrec fun Context.findActivity(): Activity? {
+    return when (this) {
+        is ContextWrapper -> when (this) {
+            is Activity -> this
+            else -> baseContext.findActivity()
+        }
+
+        else -> null
     }
 }

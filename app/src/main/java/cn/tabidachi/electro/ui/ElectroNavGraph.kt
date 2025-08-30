@@ -37,6 +37,7 @@ import cn.tabidachi.electro.ui.map.DragDropSelectPointScreen
 import cn.tabidachi.electro.ui.pair.PairScreen
 import cn.tabidachi.electro.ui.profile.ProfileScreen
 import cn.tabidachi.electro.ui.search.SearchScreen
+import cn.tabidachi.electro.ui.server.serverRoute
 import cn.tabidachi.electro.ui.sessions.SessionsScreen
 import cn.tabidachi.electro.ui.settings.SettingsScreen
 
@@ -106,12 +107,12 @@ fun ElectroNavGraph(
         composable(
             ElectroDestinations.PAIR_ROUTE,
             arguments = listOf(
-                navArgument(ElectroDestinationArgs.UID_ARG) {
+                navArgument(Args.UID.toString()) {
                     type = NavType.LongType
                 },
             )
         ) { entry ->
-            val uid = entry.arguments?.getLong(ElectroDestinationArgs.UID_ARG)
+            val uid = entry.arguments?.getLong(Args.UID.toString())
             PairScreen(uid!!, navigationActions, navHostController)
         }
         composable(ElectroDestinations.CREATE_GROUP_ROUTE) {
@@ -123,12 +124,12 @@ fun ElectroNavGraph(
         composable(
             ElectroDestinations.GROUP_ROUTE,
             arguments = listOf(
-                navArgument(ElectroDestinationArgs.SID_ARG) {
+                navArgument(Args.SID.toString()) {
                     type = NavType.LongType
                 },
             )
         ) { entry ->
-            val sid = entry.arguments?.getLong(ElectroDestinationArgs.SID_ARG)
+            val sid = entry.arguments?.getLong(Args.SID.toString())
             sid?.let {
                 GroupScreen(sid = sid, navigationActions = navigationActions)
             } ?: navHostController.navigateUp()
@@ -136,12 +137,12 @@ fun ElectroNavGraph(
         composable(
             ElectroDestinations.GROUP_DETAIL_ROUTE,
             arguments = listOf(
-                navArgument(ElectroDestinationArgs.SID_ARG) {
+                navArgument(Args.SID.toString()) {
                     type = NavType.LongType
                 },
             )
         ) { entry ->
-            val sid = entry.arguments?.getLong(ElectroDestinationArgs.SID_ARG)
+            val sid = entry.arguments?.getLong(Args.SID.toString())
             val backStackEntry = remember {
                 navHostController.getBackStackEntry(ElectroDestinations.GROUP_ROUTE)
             }
@@ -156,12 +157,12 @@ fun ElectroNavGraph(
         composable(
             ElectroDestinations.GROUP_EDIT_ROUTE,
             arguments = listOf(
-                navArgument(ElectroDestinationArgs.SID_ARG) {
+                navArgument(Args.SID.toString()) {
                     type = NavType.LongType
                 },
             )
         ) { entry ->
-            val sid = entry.arguments?.getLong(ElectroDestinationArgs.SID_ARG)
+            val sid = entry.arguments?.getLong(Args.SID.toString())
             val backStackEntry = remember {
                 navHostController.getBackStackEntry(ElectroDestinations.GROUP_ROUTE)
             }
@@ -176,7 +177,7 @@ fun ElectroNavGraph(
         composable(
             ElectroDestinations.INVITE_ROUTE,
             arguments = listOf(
-                navArgument(ElectroDestinationArgs.SID_ARG) {
+                navArgument(Args.SID.toString()) {
                     type = NavType.LongType
                 },
             )
@@ -184,19 +185,23 @@ fun ElectroNavGraph(
             val backStackEntry = remember {
                 navHostController.getBackStackEntry(ElectroDestinations.GROUP_ROUTE)
             }
-            it.arguments?.getLong(ElectroDestinationArgs.SID_ARG)?.let {
-                InviteScreen(sid = it, navigationActions = navigationActions, hiltViewModel(backStackEntry))
+            it.arguments?.getLong(Args.SID.toString())?.let {
+                InviteScreen(
+                    sid = it,
+                    navigationActions = navigationActions,
+                    hiltViewModel(backStackEntry)
+                )
             } ?: navHostController.navigateUp()
         }
         composable(
             ElectroDestinations.GROUP_ADMIN_ROUTE,
             arguments = listOf(
-                navArgument(ElectroDestinationArgs.SID_ARG) {
+                navArgument(Args.SID.toString()) {
                     type = NavType.LongType
                 },
             )
         ) { entry ->
-            val sid = entry.arguments?.getLong(ElectroDestinationArgs.SID_ARG)
+            val sid = entry.arguments?.getLong(Args.SID.toString())
             val backStackEntry = remember {
                 navHostController.getBackStackEntry(ElectroDestinations.GROUP_ROUTE)
             }
@@ -217,12 +222,12 @@ fun ElectroNavGraph(
         composable(
             ElectroDestinations.CHANNEL_ROUTE,
             arguments = listOf(
-                navArgument(ElectroDestinationArgs.SID_ARG) {
+                navArgument(Args.SID.toString()) {
                     type = NavType.LongType
                 },
             )
         ) { entry ->
-            val sid = entry.arguments?.getLong(ElectroDestinationArgs.SID_ARG)
+            val sid = entry.arguments?.getLong(Args.SID.toString())
             sid?.let {
                 ChannelScreen(sid = sid, navigationActions = navigationActions)
             } ?: navHostController.navigateUp()
@@ -230,12 +235,12 @@ fun ElectroNavGraph(
         composable(
             ElectroDestinations.CHANNEL_ADMIN_ROUTE,
             arguments = listOf(
-                navArgument(ElectroDestinationArgs.SID_ARG) {
+                navArgument(Args.SID.toString()) {
                     type = NavType.LongType
                 },
             )
         ) { entry ->
-            val sid = entry.arguments?.getLong(ElectroDestinationArgs.SID_ARG)
+            val sid = entry.arguments?.getLong(Args.SID.toString())
             val backStackEntry = remember {
                 navHostController.getBackStackEntry(ElectroDestinations.CHANNEL_ROUTE)
             }
@@ -250,12 +255,12 @@ fun ElectroNavGraph(
         composable(
             ElectroDestinations.CHANNEL_DETAIL_ROUTE,
             arguments = listOf(
-                navArgument(ElectroDestinationArgs.SID_ARG) {
+                navArgument(Args.SID.toString()) {
                     type = NavType.LongType
                 },
             )
         ) { entry ->
-            val sid = entry.arguments?.getLong(ElectroDestinationArgs.SID_ARG)
+            val sid = entry.arguments?.getLong(Args.SID.toString())
             val backStackEntry = remember {
                 navHostController.getBackStackEntry(ElectroDestinations.CHANNEL_ROUTE)
             }
@@ -270,7 +275,7 @@ fun ElectroNavGraph(
         composable(
             ElectroDestinations.CHANNEL_INVITE_ROUTE,
             arguments = listOf(
-                navArgument(ElectroDestinationArgs.SID_ARG) {
+                navArgument(Args.SID.toString()) {
                     type = NavType.LongType
                 },
             )
@@ -278,19 +283,23 @@ fun ElectroNavGraph(
             val backStackEntry = remember {
                 navHostController.getBackStackEntry(ElectroDestinations.CHANNEL_ROUTE)
             }
-            it.arguments?.getLong(ElectroDestinationArgs.SID_ARG)?.let {
-                ChannelInviteScreen(sid = it, navigationActions = navigationActions, hiltViewModel(backStackEntry))
+            it.arguments?.getLong(Args.SID.toString())?.let {
+                ChannelInviteScreen(
+                    sid = it,
+                    navigationActions = navigationActions,
+                    hiltViewModel(backStackEntry)
+                )
             } ?: navHostController.navigateUp()
         }
         composable(
             ElectroDestinations.CHANNEL_EDIT_ROUTE,
             arguments = listOf(
-                navArgument(ElectroDestinationArgs.SID_ARG) {
+                navArgument(Args.SID.toString()) {
                     type = NavType.LongType
                 },
             )
         ) { entry ->
-            val sid = entry.arguments?.getLong(ElectroDestinationArgs.SID_ARG)
+            val sid = entry.arguments?.getLong(Args.SID.toString())
             val backStackEntry = remember {
                 navHostController.getBackStackEntry(ElectroDestinations.CHANNEL_ROUTE)
             }
@@ -302,5 +311,6 @@ fun ElectroNavGraph(
                 )
             } ?: navHostController.navigateUp()
         }
+        serverRoute(navigationActions = navigationActions)
     }
 }

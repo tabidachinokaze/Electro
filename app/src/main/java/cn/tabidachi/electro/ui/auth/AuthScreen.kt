@@ -15,9 +15,14 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudCircle
+import androidx.compose.material.icons.filled.Lan
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.PersonAdd
+import androidx.compose.material.icons.twotone.Cloud
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -35,9 +40,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -68,6 +70,11 @@ fun AuthScreen(
                         AnimatedContent(targetState = viewState.method.toggle(), label = "") {
                             Text(text = stringResource(id = it.id))
                         }
+                    }
+                    IconButton(onClick = {
+                        navigationActions.navigateToServer()
+                    }) {
+                        Icon(imageVector = Icons.Outlined.Cloud, contentDescription = null)
                     }
                     IconButton(onClick = {
                         authViewModel.languageMenuExpandedChange(true)

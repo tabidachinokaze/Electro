@@ -34,7 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import cn.tabidachi.electro.R
 import cn.tabidachi.electro.ui.ElectroNavigationActions
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

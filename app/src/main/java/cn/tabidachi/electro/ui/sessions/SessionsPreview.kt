@@ -15,9 +15,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.pullrefreshx.PullRefreshIndicator
-import androidx.compose.material.pullrefreshx.pullRefresh
-import androidx.compose.material.pullrefreshx.rememberPullRefreshState
+//import androidx.compose.material.pullrefreshx.PullRefreshIndicator
+//import androidx.compose.material.pullrefreshx.pullRefresh
+//import androidx.compose.material.pullrefreshx.rememberPullRefreshState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -59,11 +59,11 @@ fun SessionsPreview(modifier: Modifier = Modifier) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val scope = rememberCoroutineScope()
 
-    val refreshState = rememberPullRefreshState(
+    /*val refreshState = rememberPullRefreshState(
         refreshing = viewState.isRefresh,
         onRefresh = {
         }
-    )
+    )*/
     val dialogs = remember {
         mutableStateListOf<Dialog>()
     }
@@ -131,7 +131,7 @@ fun SessionsPreview(modifier: Modifier = Modifier) {
         ) {
             Box(
                 modifier = Modifier
-                    .pullRefresh(state = refreshState)
+                    //.pullRefresh(state = refreshState)
                     .fillMaxSize()
                     .padding(top = it.calculateTopPadding())
             ) {
@@ -170,11 +170,11 @@ fun SessionsPreview(modifier: Modifier = Modifier) {
                         Spacer(modifier = Modifier.navigationBarsPadding())
                     }
                 }
-                PullRefreshIndicator(
+                /*PullRefreshIndicator(
                     refreshing = viewState.isRefresh,
                     state = refreshState,
                     modifier = Modifier.align(Alignment.TopCenter)
-                )
+                )*/
             }
         }
     }

@@ -1,5 +1,6 @@
 package cn.tabidachi.electro.ui.sessions
 
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -15,9 +16,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.pullrefreshx.PullRefreshIndicator
-import androidx.compose.material.pullrefreshx.pullRefresh
-import androidx.compose.material.pullrefreshx.rememberPullRefreshState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -28,6 +26,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,6 +38,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -70,14 +72,13 @@ fun SessionsScreen(
     LaunchedEffect(Unit) {
         viewModel.findUser()
     }
-    val refreshState = rememberPullRefreshState(
-        refreshing = viewState.isRefresh,
-        onRefresh = {
-            viewModel.onRefresh()
-        }
-    )
+    val refreshState = rememberPullToRefreshState()
     val context = LocalContext.current
     val dialogs by viewModel.dialogs.collectAsState(initial = emptyList())
+    val scaleFraction = {
+        if (viewState.isRefresh) 1f
+        else LinearOutSlowInEasing.transform(refreshState.distanceFraction).coerceIn(0f, 1f)
+    }
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -92,15 +93,19 @@ fun SessionsScreen(
                         DrawerSheetItem.CONTACT -> {
                             navigationActions.navigateToContact()
                         }
+
                         DrawerSheetItem.NEW_GROUP -> {
                             navigationActions.navigateToCreateGroup()
                         }
+
                         DrawerSheetItem.NEW_CHANNEL -> {
                             navigationActions.navigateToCreateChannel()
                         }
+
                         DrawerSheetItem.FAVORITE -> {
                             context.toast("功能未实现")
                         }
+
                         DrawerSheetItem.SETTINGS -> {
                             navigationActions.navigateToSettings()
                         }
@@ -131,7 +136,8 @@ fun SessionsScreen(
                         }
                     }, scrollBehavior = scrollBehavior
                 )
-            }, floatingActionButton = {
+            },
+            floatingActionButton = {
                 SessionsFloatingActionButton(
                     buttonState = buttonState,
                     onFabItemClicked = {
@@ -150,11 +156,18 @@ fun SessionsScreen(
                         }
                     }
                 )
-            }, modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+            },
+            modifier = Modifier
+                .nestedScroll(scrollBehavior.nestedScrollConnection)
+                .pullToRefresh(
+                    state = refreshState,
+                    isRefreshing = viewState.isRefresh,
+                    onRefresh = viewModel::onRefresh
+                )
         ) {
             Box(
                 modifier = Modifier
-                    .pullRefresh(state = refreshState)
+                    //.pullRefresh(state = refreshState)
                     .fillMaxSize()
                     .padding(top = it.calculateTopPadding())
             ) {
@@ -171,7 +184,9 @@ fun SessionsScreen(
                                 Image(
                                     painter = painterResource(id = R.drawable.chatgpt),
                                     contentDescription = null,
-                                    modifier = Modifier.size(48.dp).clip(CircleShape)
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(CircleShape)
                                 )
                             }
                         )
@@ -210,11 +225,19 @@ fun SessionsScreen(
                         Spacer(modifier = Modifier.navigationBarsPadding())
                     }
                 }
-                PullRefreshIndicator(
-                    refreshing = viewState.isRefresh,
-                    state = refreshState,
-                    modifier = Modifier.align(Alignment.TopCenter)
-                )
+                Box(
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .graphicsLayer {
+                            scaleX = scaleFraction()
+                            scaleY = scaleFraction()
+                        }
+                ) {
+                    PullToRefreshDefaults.Indicator(
+                        state = refreshState,
+                        isRefreshing = viewState.isRefresh
+                    )
+                }
             }
         }
     }

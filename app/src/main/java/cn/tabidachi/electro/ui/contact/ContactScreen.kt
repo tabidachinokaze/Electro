@@ -54,7 +54,7 @@ import androidx.navigation.NavHostController
 import cn.tabidachi.electro.R
 import cn.tabidachi.electro.ext.regex
 import cn.tabidachi.electro.ui.ElectroNavigationActions
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 
 @OptIn(
     ExperimentalMaterial3Api::class,
@@ -96,7 +96,7 @@ fun ContactScreen(
                                 value = viewState.filter,
                                 onValueChange = viewModel::onQueryValueChange,
                                 decorationBox = {
-                                    TextFieldDefaults.TextFieldDecorationBox(
+                                    TextFieldDefaults.DecorationBox(
                                         value = viewState.filter,
                                         innerTextField = it,
                                         enabled = true,
@@ -110,7 +110,7 @@ fun ContactScreen(
                                         },
                                         contentPadding = PaddingValues(),
                                         container = {},
-                                        colors = TextFieldDefaults.textFieldColors(),
+                                        colors = TextFieldDefaults.colors(),
                                         trailingIcon = {
                                             IconButton(onClick = {
                                                 viewModel.changeSearchState(false)

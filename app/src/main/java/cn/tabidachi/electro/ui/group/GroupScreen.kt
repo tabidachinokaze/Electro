@@ -39,7 +39,7 @@ import cn.tabidachi.electro.R
 import cn.tabidachi.electro.ui.ElectroNavigationActions
 import cn.tabidachi.electro.ui.common.MessageColumn
 import cn.tabidachi.electro.ui.common.MessageViewModel
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

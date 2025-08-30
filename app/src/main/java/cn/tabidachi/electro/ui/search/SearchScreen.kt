@@ -66,7 +66,7 @@ import cn.tabidachi.electro.data.database.entity.SessionType
 import cn.tabidachi.electro.model.UserQuery
 import cn.tabidachi.electro.ui.ElectroNavigationActions
 import cn.tabidachi.electro.ui.common.SearchTextField
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.google.accompanist.pager.pagerTabIndicatorOffset
 import kotlinx.coroutines.launch
 
@@ -146,12 +146,13 @@ fun SearchScreen(
                 userScrollEnabled = true,
                 reverseLayout = false,
                 contentPadding = PaddingValues(0.dp),
-                beyondBoundsPageCount = 0,
+                beyondViewportPageCount = 0,
                 pageSize = PageSize.Fill,
                 flingBehavior = PagerDefaults.flingBehavior(state = pagerState),
                 key = null,
                 pageNestedScrollConnection = PagerDefaults.pageNestedScrollConnection(
-                    Orientation.Horizontal
+                    state = pagerState,
+                    orientation = Orientation.Horizontal
                 ),
                 pageContent = {
                     when (SearchTab.entries[it]) {

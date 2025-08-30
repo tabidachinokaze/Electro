@@ -43,7 +43,7 @@ import cn.tabidachi.electro.PreferenceConstant
 import cn.tabidachi.electro.data.database.entity.User
 import cn.tabidachi.electro.ext.dataStore
 import cn.tabidachi.electro.ui.theme.DarkLight
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch

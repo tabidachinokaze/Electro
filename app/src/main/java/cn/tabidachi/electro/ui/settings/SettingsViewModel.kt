@@ -2,7 +2,6 @@ package cn.tabidachi.electro.ui.settings
 
 import android.app.Application
 import android.graphics.Bitmap
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -175,7 +174,7 @@ class SettingsViewModel @Inject constructor(
     fun onLanguageChange(language: Language) {
         viewModelScope.launch {
             val languageTags = LocaleListCompat.forLanguageTags(language.tag)
-            AppCompatDelegate.setApplicationLocales(languageTags)
+            //AppCompatDelegate.setApplicationLocales(languageTags)
         }
     }
 

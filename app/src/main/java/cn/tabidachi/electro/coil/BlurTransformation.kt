@@ -11,18 +11,18 @@ import android.hardware.HardwareBuffer
 import android.media.ImageReader
 import android.os.Build
 import androidx.annotation.RequiresApi
-import coil.size.Size
-import coil.transform.Transformation
+import coil3.size.Size
+import coil3.transform.Transformation
 
 @RequiresApi(Build.VERSION_CODES.S)
 class BlurTransformation(
     private val radius: Float,
     private val sampling: Float
-) : Transformation {
+) : Transformation() {
     override val cacheKey: String = "${BlurTransformation::class.java.name}-$radius-$sampling"
 
     @SuppressLint("WrongConstant")
-    override suspend fun transform(input: Bitmap, size: Size): Bitmap {
+    override suspend fun transform(input: coil3.Bitmap, size: Size): coil3.Bitmap {
         val renderNode = RenderNode("RenderEffect")
         val hardwareRenderer = HardwareRenderer()
         val imageReader = ImageReader.newInstance(

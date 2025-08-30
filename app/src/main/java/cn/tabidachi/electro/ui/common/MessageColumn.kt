@@ -1,5 +1,6 @@
 package cn.tabidachi.electro.ui.common
 
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
@@ -19,9 +20,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.pullrefreshx.PullRefreshIndicator
-import androidx.compose.material.pullrefreshx.pullRefresh
-import androidx.compose.material.pullrefreshx.rememberPullRefreshState
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -30,6 +28,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -39,6 +40,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
@@ -50,7 +52,7 @@ import cn.tabidachi.electro.ui.ElectroNavigationActions
 import cn.tabidachi.electro.ui.component.PopupMenu
 import cn.tabidachi.electro.ui.component.popupMenuAnchor
 import cn.tabidachi.electro.ui.component.rememberPopupState
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,12 +65,6 @@ fun MessageColumn(
     isMultiSession: Boolean = false,
     canSendMessage: Boolean = true,
 ) {
-    val refreshState = rememberPullRefreshState(
-        refreshing = viewModel.isRefresh,
-        onRefresh = {
-            viewModel.onRefresh()
-        }
-    )
     val listState = rememberLazyListState()
     val messages = viewModel.messages
     val messageSendingQueue = viewModel.uploadMessages
@@ -79,10 +75,14 @@ fun MessageColumn(
         mutableStateOf<DownloadMessageItem?>(null)
     }
     val popupState = rememberPopupState()
+    val refreshState = rememberPullToRefreshState()
+    val scaleFraction = {
+        if (viewModel.isRefresh) 1f
+        else LinearOutSlowInEasing.transform(refreshState.distanceFraction).coerceIn(0f, 1f)
+    }
     Column(modifier = modifier) {
         Box(
             modifier = Modifier
-                .pullRefresh(state = refreshState)
                 .weight(1f)
                 .fillMaxWidth()
         ) {
@@ -91,7 +91,11 @@ fun MessageColumn(
                 reverseLayout = true,
                 modifier = Modifier
                     .matchParentSize()
-
+                    .pullToRefresh(
+                        state = refreshState,
+                        isRefreshing = viewModel.isRefresh,
+                        onRefresh = viewModel::onRefresh
+                    )
             ) {
                 items(messageSendingQueue) { item ->
                     val (menu, onMenuChange) = remember {
@@ -162,35 +166,41 @@ fun MessageColumn(
                                 viewModel.messages.firstOrNull { it.message.mid == item.message.reply }
                             AttachmentMessage(
                                 item = item,
-                                replyContent = replyItem?.let {
-                                    {
-                                        ReplyContent(
-                                            item = it,
-                                            scope = scope,
-                                            color = when (item.type) {
-                                                BubbleType.Incoming -> MaterialTheme.colorScheme.secondary
-                                                BubbleType.Outgoing -> MaterialTheme.colorScheme.primary
-                                            },
-                                            onScrollTo = {
-                                                listState.animateScrollToItem(
-                                                    viewModel.messages.indexOf(
-                                                        replyItem
-                                                    )
+                                replyContent = {
+                                    if (replyItem != null) ReplyContent(
+                                        item = replyItem,
+                                        scope = scope,
+                                        color = when (item.type) {
+                                            BubbleType.Incoming -> MaterialTheme.colorScheme.secondary
+                                            BubbleType.Outgoing -> MaterialTheme.colorScheme.primary
+                                        },
+                                        onScrollTo = {
+                                            listState.animateScrollToItem(
+                                                viewModel.messages.indexOf(
+                                                    replyItem
                                                 )
-                                            }
-                                        )
-                                    }
+                                            )
+                                        }
+                                    )
                                 }
                             )
                         }
                     }
                 }
             }
-            PullRefreshIndicator(
-                refreshing = viewModel.isRefresh,
-                state = refreshState,
-                modifier = Modifier.align(Alignment.TopCenter)
-            )
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .graphicsLayer {
+                        scaleX = scaleFraction()
+                        scaleY = scaleFraction()
+                    }
+            ) {
+                PullToRefreshDefaults.Indicator(
+                    state = refreshState,
+                    isRefreshing = viewModel.isRefresh
+                )
+            }
             androidx.compose.animation.AnimatedVisibility(
                 visible = firstVisibleItem > 1 && listState.isScrollingUp(),
                 modifier = Modifier.align(Alignment.BottomEnd)

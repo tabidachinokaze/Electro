@@ -5,7 +5,6 @@ import android.app.Application
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.drawable.BitmapDrawable
 import android.media.MediaMetadataRetriever
 import android.media.MediaRecorder
 import android.net.Uri
@@ -41,11 +40,11 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.ContentInfoCompat
 import androidx.core.view.OnReceiveContentListener
 import androidx.hilt.navigation.compose.hiltViewModel
-import cn.tabidachi.electro.coil.BlurTransformation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cn.tabidachi.electro.LocationActivity
 import cn.tabidachi.electro.R
+import cn.tabidachi.electro.coil.BlurTransformation
 import cn.tabidachi.electro.data.Repository
 import cn.tabidachi.electro.data.database.entity.Message
 import cn.tabidachi.electro.data.database.entity.MessageSendRequest
@@ -67,10 +66,14 @@ import cn.tabidachi.electro.model.attachment.WebRTCAttachment
 import cn.tabidachi.electro.model.attachment.convert
 import cn.tabidachi.electro.model.attachment.deserialize
 import cn.tabidachi.electro.model.attachment.serialize
-import coil.executeBlocking
-import coil.imageLoader
-import coil.request.ImageRequest
-import coil.size.Scale
+import coil3.executeBlocking
+import coil3.imageLoader
+import coil3.request.ErrorResult
+import coil3.request.ImageRequest
+import coil3.request.SuccessResult
+import coil3.request.transformations
+import coil3.size.Scale
+import coil3.toBitmap
 import com.amap.api.maps.model.LatLng
 import com.amap.api.services.core.PoiItemV2
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -393,8 +396,8 @@ class MessageViewModel @Inject constructor(
                     uriDetail?.size?.let(this::size::set)
                     width = bounds.outWidth
                     height = bounds.outHeight
-                    thumb = uri.let(::loadInSize).let(::blur).let(::blur).let(::blur).let(::blur)
-                        .let(::quality)
+                    thumb = uri.let(::loadInSize)?.let(::blur)?.let(::blur)?.let(::blur)?.let(::blur)
+                        ?.let(::quality)
                 }
             }
 
@@ -446,29 +449,35 @@ class MessageViewModel @Inject constructor(
         return options
     }
 
-    private fun loadInSize(data: Any): Bitmap {
+    private fun loadInSize(data: Any): Bitmap? {
         val request = ImageRequest.Builder(application)
             .data(data)
             .size(320, 320)
             .scale(Scale.FIT)
             .build()
-        return (application.imageLoader.executeBlocking(request).drawable as BitmapDrawable).bitmap.copy(
-            Bitmap.Config.ARGB_8888,
-            true
-        )
+        val result = application.imageLoader.executeBlocking(request)
+        return when (result) {
+            is ErrorResult -> null
+            is SuccessResult -> result.image.toBitmap().copy(
+                Bitmap.Config.ARGB_8888,
+                true
+            )
+        }
     }
 
-    private fun blur(bitmap: Bitmap): Bitmap {
+    private fun blur(bitmap: Bitmap): Bitmap? {
         val request = ImageRequest.Builder(application)
             .data(bitmap)
             .transformations(BlurTransformation(25f, 1f))
             .build()
-        return (application.imageLoader.executeBlocking(request).drawable.also {
-            println("Drawable $it")
-        } as BitmapDrawable).bitmap.copy(
-            Bitmap.Config.ARGB_8888,
-            true
-        )
+        val result = application.imageLoader.executeBlocking(request)
+        return when (result) {
+            is ErrorResult -> null
+            is SuccessResult -> result.image.toBitmap().copy(
+                Bitmap.Config.ARGB_8888,
+                true
+            )
+        }
     }
 
     private fun quality(bitmap: Bitmap): ByteArray {

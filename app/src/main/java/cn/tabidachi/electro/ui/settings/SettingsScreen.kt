@@ -35,7 +35,7 @@ import cn.tabidachi.electro.R
 import cn.tabidachi.electro.ui.ElectroNavigationActions
 import cn.tabidachi.electro.ui.common.ImageTopAppBar
 import cn.tabidachi.electro.ui.common.SimpleListItem
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.mr0xf00.easycrop.CropResult
 import com.mr0xf00.easycrop.crop
 import com.mr0xf00.easycrop.rememberImageCropper

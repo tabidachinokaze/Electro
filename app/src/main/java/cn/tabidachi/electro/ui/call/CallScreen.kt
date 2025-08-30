@@ -53,17 +53,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import cn.tabidachi.electro.R
 import cn.tabidachi.electro.data.database.entity.User
+import cn.tabidachi.electro.ext.findActivity
 import cn.tabidachi.electro.ui.common.VideoRenderer
-import coil.compose.AsyncImage
-import com.google.accompanist.systemuicontroller.rememberSystemUiController
+import coil3.compose.AsyncImage
 import org.webrtc.IceCandidate
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -74,6 +78,7 @@ fun CallScreen(
     action: String,
     onCallEnd: () -> Unit = {},
 ) {
+    val context = LocalContext.current
     val viewModel: CallViewModel = hiltViewModel()
     val viewState by viewModel.viewState.collectAsState()
     val localVideoTrack by viewModel.factory.localVideoTrack.collectAsState(null)
@@ -102,10 +107,23 @@ fun CallScreen(
             view.keepScreenOn = false
         }
     })
-    val systemUiController = rememberSystemUiController()
-    LaunchedEffect(key1 = viewState.barsVisible, block = {
-        systemUiController.isSystemBarsVisible = viewState.barsVisible
-    })
+    DisposableEffect(Unit) {
+        val window = context.findActivity()?.window ?: return@DisposableEffect onDispose { }
+        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+        insetsController.apply {
+            hide(WindowInsetsCompat.Type.statusBars())
+            hide(WindowInsetsCompat.Type.navigationBars())
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+        onDispose {
+            insetsController.apply {
+                show(WindowInsetsCompat.Type.statusBars())
+                show(WindowInsetsCompat.Type.navigationBars())
+                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
     ) {

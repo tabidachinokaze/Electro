@@ -176,7 +176,7 @@ class Repository(
         url: String,
         onSuccess: () -> Unit = {},
         onFailure: () -> Unit = {},
-        progressListener: suspend (Long, Long) -> Unit = { _: Long, _: Long -> }
+        progressListener: suspend (Long, Long?) -> Unit = { _: Long, _: Long? -> }
     ) = withContext(Dispatchers.IO) {
         kotlin.runCatching {
             val readChannel = ktor.download(url, progressListener)

@@ -108,9 +108,9 @@ class ElectroViewModel @Inject constructor(
     class DownloadState {
         val progress = MutableStateFlow(0f)
         val success = MutableStateFlow(false)
-        val progressListener: suspend (bytesSentTotal: Long, contentLength: Long) -> Unit =
-            { bytesSentTotal: Long, contentLength: Long ->
-                progress.value = bytesSentTotal.toFloat() / contentLength.toFloat()
+        val progressListener: suspend (bytesSentTotal: Long, contentLength: Long?) -> Unit =
+            { bytesSentTotal: Long, contentLength: Long? ->
+                contentLength?.let { progress.value = bytesSentTotal.toFloat() / it.toFloat() }
             }
         val onSuccess = {
             success.value = true

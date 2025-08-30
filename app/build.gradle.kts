@@ -1,14 +1,15 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.konan.properties.Properties
 import java.io.FileInputStream
 
 plugins {
-    alias(libs.plugins.agp)
-    alias(libs.plugins.kotlin)
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.hilt)
-    alias(libs.plugins.serialization)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.services)
-    id("kotlin-kapt")
+    alias(libs.plugins.kotlin.compose)
 }
 
 val properties = Properties().apply {
@@ -17,12 +18,12 @@ val properties = Properties().apply {
 
 android {
     namespace = "cn.tabidachi.electro"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "cn.tabidachi.electro"
         minSdk = 28
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 5
         versionName = "1.0.5"
 
@@ -50,11 +51,27 @@ android {
     }
     buildTypes {
         release {
-            buildConfigField("String", "APP_CENTER_SECRET", properties.getProperty("appCenter.secret"))
-            buildConfigField("String", "ELECTRO_SERVER_HOST", properties.getProperty("electro.server.host.release"))
+            buildConfigField(
+                "String",
+                "APP_CENTER_SECRET",
+                properties.getProperty("appCenter.secret")
+            )
+            buildConfigField(
+                "String",
+                "ELECTRO_SERVER_HOST",
+                properties.getProperty("electro.server.host.release")
+            )
             buildConfigField("String", "MINIO_URL", properties.getProperty("minio.url.release"))
-            buildConfigField("String", "MINIO_ACCESS_KEY", properties.getProperty("minio.accessKey.release"))
-            buildConfigField("String", "MINIO_SECRET_KEY", properties.getProperty("minio.secretKey.release"))
+            buildConfigField(
+                "String",
+                "MINIO_ACCESS_KEY",
+                properties.getProperty("minio.accessKey.release")
+            )
+            buildConfigField(
+                "String",
+                "MINIO_SECRET_KEY",
+                properties.getProperty("minio.secretKey.release")
+            )
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
@@ -62,11 +79,27 @@ android {
             signingConfig = signingConfigs.getByName("release")
         }
         debug {
-            buildConfigField("String", "APP_CENTER_SECRET", properties.getProperty("appCenter.secret"))
-            buildConfigField("String", "ELECTRO_SERVER_HOST", properties.getProperty("electro.server.host.debug"))
+            buildConfigField(
+                "String",
+                "APP_CENTER_SECRET",
+                properties.getProperty("appCenter.secret")
+            )
+            buildConfigField(
+                "String",
+                "ELECTRO_SERVER_HOST",
+                properties.getProperty("electro.server.host.debug")
+            )
             buildConfigField("String", "MINIO_URL", properties.getProperty("minio.url.debug"))
-            buildConfigField("String", "MINIO_ACCESS_KEY", properties.getProperty("minio.accessKey.debug"))
-            buildConfigField("String", "MINIO_SECRET_KEY", properties.getProperty("minio.secretKey.debug"))
+            buildConfigField(
+                "String",
+                "MINIO_ACCESS_KEY",
+                properties.getProperty("minio.accessKey.debug")
+            )
+            buildConfigField(
+                "String",
+                "MINIO_SECRET_KEY",
+                properties.getProperty("minio.secretKey.debug")
+            )
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
@@ -81,9 +114,6 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion = libs.versions.compose.compiler.get()
     }
     packaging {
         resources {
@@ -103,9 +133,15 @@ android {
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
+    }
+}
+
 dependencies {
 
-    implementation(libs.core.ktx)
+    implementation(libs.androidx.core.ktx)
     implementation(libs.lifecycle.runtime.ktx)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.activity.compose)
@@ -114,7 +150,7 @@ dependencies {
     implementation(libs.bundles.accompanist)
     implementation(libs.datastore.preferences)
     implementation(libs.hilt.android)
-    kapt(libs.hilt.compiler)
+    ksp(libs.hilt.compiler)
     implementation(libs.bundles.navigation.compose)
     implementation(libs.bundles.ktor)
     implementation(platform(libs.coil.bom))
@@ -124,13 +160,14 @@ dependencies {
     ksp(libs.room.compiler)
     implementation(libs.compose.constraintlayout)
     implementation(libs.minio)
-    implementation(libs.google.webrtc)
     implementation(platform(libs.firebase.bom))
     implementation(libs.bundles.firebase)
     implementation(libs.bundles.appcenter)
     implementation(libs.tabler.icons)
     implementation(files("libs/AMap3DMap_9.6.0_AMapSearch_9.5.0_AMapLocation_6.2.0_20230116.jar"))
     implementation(libs.okhttp)
+    implementation(libs.webrtc.android)
+    implementation(libs.kotlinx.serialization.json)
     // test
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.ext.junit)
@@ -140,8 +177,4 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
 
-}
-
-kapt {
-    correctErrorTypes = true
 }

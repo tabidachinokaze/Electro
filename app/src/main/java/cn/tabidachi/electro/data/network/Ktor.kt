@@ -451,7 +451,7 @@ class Ktor(
 
     suspend fun download(
         url: String,
-        progressListener: suspend (bytesSentTotal: Long, contentLength: Long) -> Unit
+        progressListener: suspend (bytesSentTotal: Long, contentLength: Long?) -> Unit
     ): ByteReadChannel {
         return client.get(url) {
             onDownload(progressListener)

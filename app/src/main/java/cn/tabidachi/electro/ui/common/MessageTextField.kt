@@ -52,7 +52,7 @@ fun MessageTextField(
         ),
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         decorationBox = {
-            TextFieldDefaults.TextFieldDecorationBox(
+            TextFieldDefaults.DecorationBox(
                 value = text,
                 innerTextField = it,
                 enabled = true,

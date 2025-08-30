@@ -37,9 +37,9 @@ import cn.tabidachi.electro.model.attachment.VideoAttachment
 import cn.tabidachi.electro.model.attachment.VoiceAttachment
 import cn.tabidachi.electro.model.attachment.WebRTCAttachment
 import cn.tabidachi.electro.ui.common.attachment.AudioAttachment
-import coil.compose.AsyncImage
-import coil.decode.VideoFrameDecoder
-import coil.request.ImageRequest
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.video.VideoFrameDecoder
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -64,7 +64,7 @@ fun AttachmentRow(
                     it.hashCode()
                 }
             ) { attachment ->
-                Box(modifier = Modifier.animateItemPlacement()) {
+                Box(modifier = Modifier.animateItem()) {
                     Box(
                         modifier = Modifier
                             .clip(ItemShape)

@@ -53,12 +53,19 @@ fun AnimatedColorScheme(colorScheme: ColorScheme, content: @Composable (ColorSch
             colors[26].value,
             colors[27].value,
             colors[28].value,
+            colors[29].value,
+            colors[30].value,
+            colors[31].value,
+            colors[32].value,
+            colors[33].value,
+            colors[34].value,
+            colors[35].value,
         )
     )
 }
 
 class ColorSchemeViewModel : ViewModel() {
-    val colors = Array(29) { Animatable(Color.Unspecified) }
+    val colors = Array(36) { Animatable(Color.Unspecified) }
 }
 
 private fun ColorScheme.toColorArray(): Array<Color> = arrayOf(
@@ -91,6 +98,13 @@ private fun ColorScheme.toColorArray(): Array<Color> = arrayOf(
     outline,
     outlineVariant,
     scrim,
+    surfaceBright,
+    surfaceDim,
+    surfaceContainer,
+    surfaceContainerHigh,
+    surfaceContainerHighest,
+    surfaceContainerLow,
+    surfaceContainerLowest,
 )
 
 private val ColorSchemeAnimationSpec = tween<Color>(1000)

@@ -10,13 +10,10 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import cn.tabidachi.electro.R
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
-import com.google.accompanist.systemuicontroller.rememberSystemUiController
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -59,11 +56,6 @@ fun ElectroTheme(
         }
     })
 
-    val systemUiController = rememberSystemUiController()
-    SideEffect {
-        systemUiController.setSystemBarsColor(color = Color.Transparent, darkIcons = !darkMode)
-        systemUiController.isNavigationBarContrastEnforced = false
-    }
     AnimatedColorScheme(colorScheme = colorScheme) {
         MaterialTheme(
             colorScheme = it,

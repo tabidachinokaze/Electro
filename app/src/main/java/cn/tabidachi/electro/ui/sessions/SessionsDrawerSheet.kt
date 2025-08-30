@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import cn.tabidachi.electro.R
 import cn.tabidachi.electro.ui.sessions.components.UserCard
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 
 @Composable
 fun SessionsDrawerSheet(

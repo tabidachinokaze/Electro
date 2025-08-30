@@ -2,8 +2,8 @@ package cn.tabidachi.electro
 
 import android.app.Activity
 import android.os.Bundle
+import androidx.activity.ComponentActivity
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
@@ -21,7 +21,7 @@ import com.microsoft.appcenter.distribute.ReleaseDetails
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
-class MainActivity : AppCompatActivity(), DistributeListener {
+class MainActivity : ComponentActivity(), DistributeListener {
     private val electroViewModel: ElectroViewModel by viewModels()
     private var updateDialogVisible by mutableStateOf(false)
     private var releaseDetails by mutableStateOf<ReleaseDetails?>(null)

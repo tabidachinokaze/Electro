@@ -36,7 +36,7 @@ fun SearchTextField(
         singleLine = true,
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         decorationBox = {
-            TextFieldDefaults.TextFieldDecorationBox(
+            TextFieldDefaults.DecorationBox(
                 value = value,
                 innerTextField = it,
                 enabled = true,

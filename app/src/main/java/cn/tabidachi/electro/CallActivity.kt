@@ -69,9 +69,9 @@ class CallActivity : ComponentActivity() {
         }
     }
 
-    override fun onNewIntent(intent: Intent?) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent?.getStringExtra("notification_id")?.let {
+        intent.getStringExtra("notification_id")?.let {
             NotificationManagerCompat.from(this).cancel(it.toInt())
         }
     }

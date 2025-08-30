@@ -12,7 +12,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Done
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Send
-import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
@@ -20,6 +19,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -67,46 +67,47 @@ fun AttachmentSelector(
             }
         }
         if (isProcessing) {
-            CircularProgressIndicator(strokeWidth = 3.dp, strokeCap = StrokeCap.Round, modifier = Modifier.size(24.dp))
+            CircularProgressIndicator(
+                strokeWidth = 3.dp,
+                strokeCap = StrokeCap.Round,
+                modifier = Modifier.size(24.dp)
+            )
         } else
-        if (isEditing) {
-            FilledIconButton(onClick = onEdited) {
-                Icon(imageVector = Icons.Rounded.Done, contentDescription = null)
-            }
-        } else if (sendButtonEnabled) {
-            IconButton(onClick = onSend) {
-                Icon(
-                    imageVector = Icons.Rounded.Send, contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-        } else {
-            Box(
-                modifier = modifier
-                    .size(40.0.dp)
-                    .clip(CircleShape)
-                    .combinedClickable(
-                        onClick = {
-
-                        }, onLongClick = onRecording,
-                        enabled = !isRecording,
-                        role = Role.Button,
-                        interactionSource = remember {
-                            MutableInteractionSource()
-                        },
-                        indication = rememberRipple(
-                            bounded = false,
-                            radius = 40.0.dp / 2
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.primary) {
+            if (isEditing) {
+                FilledIconButton(onClick = onEdited) {
+                    Icon(imageVector = Icons.Rounded.Done, contentDescription = null)
+                }
+            } else if (sendButtonEnabled) {
+                IconButton(onClick = onSend) {
                     Icon(
-                        imageVector = Icons.Rounded.Mic, contentDescription = null,
+                        imageVector = Icons.Rounded.Send, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
+            } else {
+                Box(
+                    modifier = modifier
+                        .size(40.0.dp)
+                        .clip(CircleShape)
+                        .combinedClickable(
+                            onClick = {
+
+                            }, onLongClick = onRecording,
+                            enabled = !isRecording,
+                            role = Role.Button,
+                            interactionSource = remember {
+                                MutableInteractionSource()
+                            },
+                            indication = remember { ripple(bounded = false, radius = 40.0.dp / 2) }
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.primary) {
+                        Icon(
+                            imageVector = Icons.Rounded.Mic, contentDescription = null,
+                        )
+                    }
+                }
             }
-        }
     }
 }
