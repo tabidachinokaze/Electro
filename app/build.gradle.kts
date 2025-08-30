@@ -1,6 +1,8 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.konan.properties.Properties
 import java.io.FileInputStream
+import java.text.SimpleDateFormat
+import java.util.Date
 
 plugins {
     alias(libs.plugins.android.application)
@@ -16,6 +18,16 @@ val properties = Properties().apply {
     load(FileInputStream(project.rootProject.file("electro.properties")))
 }
 
+val commitCount = providers.exec {
+    commandLine("git", "rev-list", "--count", "HEAD")
+}.standardOutput.asText.get().trim()
+
+val commitHash = providers.exec {
+    commandLine("git", "rev-parse", "--short", "HEAD")
+}.standardOutput.asText.get().trim()
+
+val buildDateTime: String = SimpleDateFormat("yy.MMddHH").format(Date())
+
 android {
     namespace = "cn.tabidachi.electro"
     compileSdk = 36
@@ -24,8 +36,9 @@ android {
         applicationId = "cn.tabidachi.electro"
         minSdk = 28
         targetSdk = 36
-        versionCode = 5
-        versionName = "1.0.5"
+        versionCode = commitCount.toInt()
+
+        versionName = "2.$buildDateTime-$commitHash"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
