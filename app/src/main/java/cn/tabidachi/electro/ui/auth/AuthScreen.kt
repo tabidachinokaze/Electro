@@ -1,7 +1,10 @@
 package cn.tabidachi.electro.ui.auth
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -15,14 +18,10 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.CloudCircle
-import androidx.compose.material.icons.filled.Lan
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.PersonAdd
-import androidx.compose.material.icons.twotone.Cloud
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -41,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -48,7 +48,7 @@ import androidx.navigation.NavHostController
 import cn.tabidachi.electro.R
 import cn.tabidachi.electro.ui.ElectroNavigationActions
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthScreen(
     authViewModel: AuthViewModel = hiltViewModel(),
@@ -57,6 +57,7 @@ fun AuthScreen(
 ) {
     val viewState by authViewModel.viewState.collectAsState()
     val hostState = authViewModel.hostState
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -77,7 +78,14 @@ fun AuthScreen(
                         Icon(imageVector = Icons.Outlined.Cloud, contentDescription = null)
                     }
                     IconButton(onClick = {
-                        authViewModel.languageMenuExpandedChange(true)
+                        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            Intent(Settings.ACTION_APP_LOCALE_SETTINGS).apply {
+                                data = Uri.fromParts("package", context.packageName, null)
+                            }
+                        } else {
+                            Intent(Settings.ACTION_LOCALE_SETTINGS)
+                        }
+                        context.startActivity(intent)
                     }) {
                         Icon(imageVector = Icons.Default.Language, contentDescription = "Language")
                     }
