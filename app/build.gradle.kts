@@ -29,11 +29,11 @@ val commitHash = providers.exec {
 val buildDateTime: String = SimpleDateFormat("yy.MMddHH").format(Date())
 
 android {
-    namespace = "cn.tabidachi.electro"
+    namespace = "moe.tabidachi.electro"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "cn.tabidachi.electro"
+        applicationId = "moe.tabidachi.electro"
         minSdk = 28
         targetSdk = 36
         versionCode = commitCount.toInt()

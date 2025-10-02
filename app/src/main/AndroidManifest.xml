@@ -24,6 +24,7 @@
     <application
         android:name=".ElectroApplication"
         android:allowBackup="true"
+        android:allowNativeHeapPointerTagging="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -32,15 +33,13 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Electro"
-        android:allowNativeHeapPointerTagging="false"
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
         <activity
-            android:name="cn.tabidachi.electro.LocationActivity"
+            android:name=".LocationActivity"
             android:exported="true"
             android:launchMode="standard"
-            android:theme="@style/Theme.Electro">
-        </activity>
+            android:theme="@style/Theme.Electro" />
 
         <meta-data
             android:name="com.amap.api.v2.apikey"
@@ -108,7 +107,7 @@
 
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="cn.tabidachi.electro.FileProvider"
+            android:authorities="${applicationId}.FileProvider"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data

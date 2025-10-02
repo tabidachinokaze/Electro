@@ -24,7 +24,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import cn.tabidachi.electro.R
+import moe.tabidachi.electro.R
 import com.mr0xf00.easycrop.*
 
 private val CropperDialogProperties = (DialogProperties(
