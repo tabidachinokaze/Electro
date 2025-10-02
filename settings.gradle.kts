@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Electro"
 include(":app")
+include(":compose-mvi")
