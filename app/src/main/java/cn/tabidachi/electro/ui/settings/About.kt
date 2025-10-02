@@ -7,8 +7,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.NewReleases
-import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.core.net.toUri
 import cn.tabidachi.electro.AppCenter
 import cn.tabidachi.electro.BuildConfig
 import cn.tabidachi.electro.R
@@ -34,46 +35,61 @@ fun LazyListScope.About() {
         val context = LocalContext.current
         val clipboardManager = LocalClipboardManager.current
         SettingsCategory(stringResource(id = R.string.about)) {
-            About.values().forEach {
+            About.entries.forEach {
                 when (it) {
                     About.VERSION -> {
                         ListItem(
                             headlineContent = {
                                 Text(text = stringResource(id = it.text))
-                            }, supportingContent = {
+                            },
+                            supportingContent = {
                                 Text(text = BuildConfig.VERSION_NAME)
-                            }, leadingContent = {
+                            },
+                            leadingContent = {
                                 Icon(imageVector = it.icon, contentDescription = null)
-                            }, modifier = Modifier.combinedClickable(
+                            },
+                            modifier = Modifier.combinedClickable(
                                 onClick = {
                                     AppCenter.allowToast = true
                                     Distribute.checkForUpdate()
-                                }, onLongClick = {
+                                },
+                                onLongClick = {
                                     clipboardManager.setText(AnnotatedString(BuildConfig.VERSION_NAME))
                                 }
-                            ), trailingContent = {
-                                IconButton(onClick = {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(it.data))
-                                    context.startActivity(intent)
-                                }) {
-                                    Icon(imageVector = Icons.Rounded.OpenInNew, contentDescription = null)
+                            ),
+                            trailingContent = {
+                                IconButton(
+                                    onClick = {
+                                        val intent = Intent(Intent.ACTION_VIEW, it.data.toUri())
+                                        context.startActivity(intent)
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
+                                        contentDescription = null
+                                    )
                                 }
                             }
                         )
                     }
+
                     else -> {
                         ListItem(
                             headlineContent = {
                                 Text(text = stringResource(id = it.text))
-                            }, supportingContent = {
+                            },
+                            supportingContent = {
                                 Text(text = it.data)
-                            }, leadingContent = {
+                            },
+                            leadingContent = {
                                 Icon(imageVector = it.icon, contentDescription = null)
-                            }, modifier = Modifier.combinedClickable(
+                            },
+                            modifier = Modifier.combinedClickable(
                                 onClick = {
                                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(it.data))
                                     context.startActivity(intent)
-                                }, onLongClick = {
+                                },
+                                onLongClick = {
                                     clipboardManager.setText(AnnotatedString(it.data))
                                 }
                             )
@@ -86,7 +102,11 @@ fun LazyListScope.About() {
 }
 
 enum class About(@StringRes val text: Int, val icon: ImageVector, val data: String) {
-    VERSION(R.string.version, Icons.Rounded.NewReleases, "https://install.appcenter.ms/users/tabidachinokaze/apps/electro/distribution_groups/electro"),
+    VERSION(
+        R.string.version,
+        Icons.Rounded.NewReleases,
+        "https://install.appcenter.ms/users/tabidachinokaze/apps/electro/distribution_groups/electro"
+    ),
     TELEGRAM(R.string.telegram, TablerIcons.BrandTelegram, "https://t.me/tabidachinokaze"),
     GITHUB(R.string.github, TablerIcons.BrandGithub, "https://github.com/tabidachinokaze")
 }

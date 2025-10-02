@@ -18,10 +18,10 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Output
 import androidx.compose.material.icons.rounded.PersonAdd
-import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -32,7 +32,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,27 +41,70 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.composable
 import cn.tabidachi.electro.R
-import cn.tabidachi.electro.ui.ElectroNavigationActions
+import cn.tabidachi.electro.model.EmptyMessenger
+import cn.tabidachi.electro.model.Messenger
 import cn.tabidachi.electro.ui.common.ImageTopAppBar
+import cn.tabidachi.electro.ui.group.GroupContract.Event
+import cn.tabidachi.electro.ui.group.GroupContract.State
+import cn.tabidachi.electro.ui.pair.navigateToPair
+import cn.tabidachi.electro.ui.preview.PreviewSurface
+import cn.tabidachi.electro.ui.preview.Previews
 import coil3.compose.AsyncImage
+import kotlinx.serialization.Serializable
+import moe.tabidachi.compose.mvi.observe
+
+@Serializable
+data object GroupDetailRoute
+
+context(navController: NavHostController)
+fun NavGraphBuilder.groupDetail() = composable<GroupDetailRoute> {
+    val viewModel: GroupViewModel =
+        hiltViewModel(navController.getBackStackEntry(GroupRoute::class))
+    val (state, event) = viewModel.observe {
+        when (it) {
+            GroupContract.Effect.NavigateUp -> navController.navigateUp()
+        }
+    }
+    GroupDetailScreen(
+        state = state.value,
+        event = {
+            when (it) {
+                is Event.NavigateToChannelAdmin -> navController.navigateToGroupAdmin()
+                is Event.NavigateToChannelDetail -> navController.navigateToGroupDetail()
+                is Event.NavigateToChannelEdit -> navController.navigateToGroupEdit()
+                is Event.NavigateToChannelInvite -> navController.navigateToGroupInvite()
+                is Event.NavigateToPair -> navController.navigateToPair(it.uid)
+                Event.NavigateUp -> navController.navigateUp()
+                else -> event(it)
+            }
+        },
+        messenger = viewModel.messenger
+    )
+}
+
+fun NavHostController.navigateToGroupDetail() {
+    navigate(GroupDetailRoute)
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun GroupDetailScreen(
-    sid: Long,
-    navigationActions: ElectroNavigationActions,
-    viewModel: GroupViewModel
+    state: State,
+    event: (Event) -> Unit,
+    messenger: Messenger
 ) {
-    val viewState by viewModel.viewState.collectAsState()
     var menuExpanded by remember {
         mutableStateOf(false)
     }
-    LaunchedEffect(key1 = Unit, block = {
-        viewModel.getSessionUser(sid)
-        viewModel.getSessionInfo(sid)
-        viewModel.getAdmin(sid)
-    })
+    LaunchedEffect(Unit) {
+        event(Event.GetSessionUser)
+        event(Event.GetSessionInfo)
+    }
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
         topBar = {
@@ -70,31 +112,42 @@ fun GroupDetailScreen(
                 title = {
                     Column {
                         Text(
-                            text = viewState.dialog?.title ?: "",
+                            text = state.dialog?.title ?: "",
                             maxLines = 1,
                             style = MaterialTheme.typography.bodyLarge
                         )
                         Text(
-                            text = stringResource(id = R.string.online_count, viewModel.online()),
+                            text = stringResource(id = R.string.online_count, messenger.online()),
                             maxLines = 1,
-                            style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         )
                     }
-                }, image = {
+                },
+                image = {
                     AsyncImage(
-                        model = viewState.dialog?.image,
+                        model = state.dialog?.image,
                         contentDescription = null,
                         contentScale = ContentScale.Crop
                     )
-                }, navigationIcon = {
-                    IconButton(onClick = navigationActions::navigateUp) {
+                },
+                navigationIcon = {
+                    IconButton(
+                        onClick = { event(Event.NavigateUp) }
+                    ) {
                         Icon(imageVector = Icons.Rounded.ArrowBack, contentDescription = null)
                     }
-                }, actions = {
-                    if (viewState.isAdmin) {
-                        IconButton(onClick = {
-                            navigationActions.navigateToGroupEdit(sid)
-                        }) {
+                },
+                actions = {
+                    if (state.isAdmin) {
+                        IconButton(
+                            onClick = {
+                                messenger.sid.value?.let {
+                                    event(Event.NavigateToChannelEdit(it))
+                                }
+                            }
+                        ) {
                             Icon(imageVector = Icons.Rounded.Edit, contentDescription = null)
                         }
                     }
@@ -112,39 +165,47 @@ fun GroupDetailScreen(
                                     imageVector = Icons.Rounded.Output,
                                     contentDescription = null
                                 )
-                            }, text = {
+                            },
+                            text = {
                                 Text(text = stringResource(id = R.string.leave_group))
-                            }, onClick = {
-                                viewModel.exitGroup(sid, navigationActions::navigateUp)
+                            },
+                            onClick = {
+                                event(Event.ExitGroup)
                                 menuExpanded = false
                             }
                         )
                     }
-                }, scrollBehavior = scrollBehavior
+                },
+                scrollBehavior = scrollBehavior
             )
-        }, modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+        },
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
     ) {
         LazyColumn(
             contentPadding = PaddingValues(top = it.calculateTopPadding())
         ) {
             item {
-                Divider(thickness = 8.dp)
+                HorizontalDivider(thickness = 8.dp)
                 Column(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     ListItem(
                         headlineContent = {
                             Text(text = stringResource(id = R.string.add_members))
-                        }, leadingContent = {
+                        },
+                        leadingContent = {
                             Icon(imageVector = Icons.Rounded.PersonAdd, contentDescription = null)
-                        }, modifier = Modifier
+                        },
+                        modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                navigationActions.navigateToInvite(sid)
+                                messenger.sid.value?.let {
+                                    event(Event.NavigateToChannelInvite(it))
+                                }
                             }
                     )
                 }
-                Divider(thickness = 8.dp)
+                HorizontalDivider(thickness = 8.dp)
             }
             stickyHeader {
                 ListItem(
@@ -155,19 +216,24 @@ fun GroupDetailScreen(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
-                    }, trailingContent = {
-                        if (viewState.isAdmin) {
-                            IconButton(onClick = {
-                                navigationActions.navigateToGroupAdmin(sid)
-                            }) {
+                    },
+                    trailingContent = {
+                        if (state.isAdmin) {
+                            IconButton(
+                                onClick = {
+                                    messenger.sid.value?.let {
+                                        event(Event.NavigateToChannelAdmin(it))
+                                    }
+                                }
+                            ) {
                                 Icon(imageVector = Icons.Rounded.Edit, contentDescription = null)
                             }
                         }
                     }
                 )
-                Divider()
+                HorizontalDivider()
             }
-            items(viewState.users) {
+            items(state.users) {
                 ListItem(
                     leadingContent = {
                         Surface(
@@ -179,16 +245,21 @@ fun GroupDetailScreen(
                     },
                     headlineContent = {
                         Text(text = it.username)
-                    }, supportingContent = {
-                        if (viewModel.online(it.uid)) {
-                            Text(text = stringResource(id = R.string.online), color = MaterialTheme.colorScheme.primary)
+                    },
+                    supportingContent = {
+                        if (messenger.online(it.uid)) {
+                            Text(
+                                text = stringResource(id = R.string.online),
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         } else {
                             Text(text = stringResource(id = R.string.offline))
                         }
-                    }, modifier = Modifier
+                    },
+                    modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
-                            navigationActions.navigateToPair(it.uid)
+                            event(Event.NavigateToPair(it.uid))
                         }
                 )
             }
@@ -196,5 +267,17 @@ fun GroupDetailScreen(
                 Spacer(modifier = Modifier.navigationBarsPadding())
             }
         }
+    }
+}
+
+@Composable
+@Previews
+private fun GroupDetailScreenPreview() {
+    PreviewSurface {
+        GroupDetailScreen(
+            state = State(),
+            event = {},
+            messenger = EmptyMessenger
+        )
     }
 }

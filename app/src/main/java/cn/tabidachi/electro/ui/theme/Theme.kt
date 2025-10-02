@@ -50,19 +50,17 @@ fun ElectroTheme(
         )
     )
 
-    LaunchedEffect(key1 = Unit, block = {
+    LaunchedEffect(Unit) {
         if (!permissionsState.allPermissionsGranted) {
             permissionsState.launchMultiplePermissionRequest()
         }
-    })
-
-    AnimatedColorScheme(colorScheme = colorScheme) {
-        MaterialTheme(
-            colorScheme = it,
-            typography = Typography,
-            content = content
-        )
     }
+
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = Typography,
+        content = content
+    )
 }
 
 enum class DarkLight(@StringRes val text: Int) {

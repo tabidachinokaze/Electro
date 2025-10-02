@@ -10,8 +10,10 @@ import androidx.lifecycle.viewModelScope
 import cn.tabidachi.electro.data.Repository
 import cn.tabidachi.electro.data.network.Ktor
 import cn.tabidachi.electro.ext.dataStore
-import cn.tabidachi.electro.ui.ElectroDestinations
-import cn.tabidachi.electro.ui.auth.AuthViewModel
+import cn.tabidachi.electro.ktx.TAG
+import cn.tabidachi.electro.ui.auth.AuthRoute
+import cn.tabidachi.electro.ui.sessions.SessionsRoute
+import cn.tabidachi.electro.ui.splash.SplashRoute
 import cn.tabidachi.electro.ui.theme.DarkLight
 import cn.tabidachi.electro.ui.theme.Theme
 import com.google.firebase.messaging.FirebaseMessaging
@@ -47,13 +49,13 @@ class ElectroViewModel @Inject constructor(
         viewModelScope.launch {
             account.collectLatest { (token: String?, uid: Long) ->
                 if (token.isNullOrBlank() || uid == 0L) {
-                    _viewState.update { it.copy(startDestination = ElectroDestinations.AUTH_ROUTE) }
+                    _viewState.update { it.copy(startDestination = AuthRoute) }
                     ktor.ws.pause()
                     ktor.ws.close()
                 } else {
                     if (ktor.token != token && ktor.uid != uid) {
                         ktor.ws.close()
-                        _viewState.update { it.copy(startDestination = ElectroDestinations.SPLASH_ROUTE) }
+                        _viewState.update { it.copy(startDestination = SplashRoute) }
                     }
                     ktor.token = token
                     ktor.uid = uid
@@ -65,16 +67,16 @@ class ElectroViewModel @Inject constructor(
                                     setBody(it.result)
                                 }
                             }.onFailure {
-                                Log.d(AuthViewModel.TAG, "getDeviceToken: onFailure")
+                                Log.d(TAG, "getDeviceToken: onFailure")
                                 it.printStackTrace()
                             }.onSuccess {
-                                Log.d(AuthViewModel.TAG, "getDeviceToken: onSuccess")
+                                Log.d(TAG, "getDeviceToken: onSuccess")
                             }
                         }
                     }
                     ktor.ws.resume()
                     delay(200)
-                    _viewState.update { it.copy(startDestination = ElectroDestinations.DIALOGS_ROUTE) }
+                    _viewState.update { it.copy(startDestination = SessionsRoute) }
                 }
             }
         }
@@ -121,5 +123,5 @@ class ElectroViewModel @Inject constructor(
 data class ElectroViewState(
     val token: String? = null,
     val isReady: Boolean = false,
-    val startDestination: String = ElectroDestinations.SPLASH_ROUTE
+    val startDestination: Any = SplashRoute
 )

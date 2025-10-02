@@ -1,15 +1,13 @@
 package cn.tabidachi.electro.ui.profile
 
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cn.tabidachi.electro.data.Repository
-import cn.tabidachi.electro.data.database.entity.User
 import cn.tabidachi.electro.data.network.Ktor
 import cn.tabidachi.electro.model.request.UserUpdateRequest
+import cn.tabidachi.electro.ui.profile.ProfileContract.Effect
+import cn.tabidachi.electro.ui.profile.ProfileContract.Event
+import cn.tabidachi.electro.ui.profile.ProfileContract.State
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -17,15 +15,24 @@ import javax.inject.Inject
 class ProfileViewModel @Inject constructor(
     private val repository: Repository,
     private val ktor: Ktor
-) : ViewModel() {
-    private val _viewState = MutableStateFlow(ProfileViewState())
-    val viewState = _viewState.asStateFlow()
+) : ProfileContract.ViewModel(State()) {
+    override fun event(event: Event) {
+        when (event) {
+            Event.Done -> done()
+            Event.GetUser -> getUser()
+            Event.NavigateUp -> Unit
+            is Event.OnEmailChange -> onEmailChange(event.value)
+            is Event.OnPasswordChange -> onPasswordChange(event.value)
+            is Event.OnUsernameChange -> onUsernameChange(event.value)
+            Event.OnVisibleChange -> onVisibleChange()
+        }
+    }
 
     fun getUser() {
         viewModelScope.launch {
             repository.getUser(ktor.uid).onSuccess {
                 it.data?.let { user ->
-                    _viewState.update {
+                    updateState {
                         it.copy(
                             user = user,
                             username = user.username,
@@ -38,26 +45,26 @@ class ProfileViewModel @Inject constructor(
     }
 
     fun onUsernameChange(value: String) {
-        _viewState.update { it.copy(username = value) }
+        updateState { it.copy(username = value) }
     }
 
     fun onEmailChange(value: String) {
-        _viewState.update { it.copy(email = value) }
+        updateState { it.copy(email = value) }
     }
 
     fun onPasswordChange(value: String) {
-        _viewState.update { it.copy(password = value) }
+        updateState { it.copy(password = value) }
     }
 
     fun onVisibleChange() {
-        _viewState.update { it.copy(passwordVisible = !it.passwordVisible) }
+        updateState { it.copy(passwordVisible = !it.passwordVisible) }
     }
 
-    fun done(onSuccess: () -> Unit) {
+    fun done() {
         viewModelScope.launch {
-            _viewState.value.apply {
+            state.value.apply {
                 if (username == user.username && email == user.email && password.isBlank()) {
-                    onSuccess()
+                    emitEffect(Effect.NavigateUp)
                     return@apply
                 }
                 val username = if (username == user.username) null else username
@@ -66,17 +73,9 @@ class ProfileViewModel @Inject constructor(
                 val result =
                     repository.updateUserInfo(UserUpdateRequest(username, password, email, null))
                 if (result) {
-                    onSuccess()
+                    emitEffect(Effect.NavigateUp)
                 }
             }
         }
     }
 }
-
-data class ProfileViewState(
-    val user: User = User(-1, "", "", ""),
-    val username: String = "",
-    val email: String = "",
-    val password: String = "",
-    val passwordVisible: Boolean = false
-)

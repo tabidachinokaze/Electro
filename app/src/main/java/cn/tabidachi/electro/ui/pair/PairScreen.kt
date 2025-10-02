@@ -19,8 +19,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,37 +29,37 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavHostController
 import cn.tabidachi.electro.R
-import cn.tabidachi.electro.ui.ElectroNavigationActions
+import cn.tabidachi.electro.model.EmptyMessenger
+import cn.tabidachi.electro.model.Messenger
+import cn.tabidachi.electro.ui.common.EmptyMessageManager
+import cn.tabidachi.electro.ui.common.MessageAction
 import cn.tabidachi.electro.ui.common.MessageColumn
-import cn.tabidachi.electro.ui.common.MessageViewModel
+import cn.tabidachi.electro.ui.common.MessageManager
 import cn.tabidachi.electro.ui.common.SimpleListItem
+import cn.tabidachi.electro.ui.pair.PairContract.Event
+import cn.tabidachi.electro.ui.pair.PairContract.State
+import cn.tabidachi.electro.ui.preview.PreviewSurface
+import cn.tabidachi.electro.ui.preview.Previews
 import coil3.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PairScreen(
-    target: Long,
-    navigationActions: ElectroNavigationActions,
-    navHostController: NavHostController
+    state: State,
+    event: (Event) -> Unit,
+    messenger: Messenger,
+    messageManager: MessageManager,
+    action: MessageAction
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    val viewModel: PairViewModel = hiltViewModel()
-    val messageViewModel: MessageViewModel = hiltViewModel()
-    val viewState by viewModel.viewState.collectAsState()
-    val targetUser = viewState.targetUser
-    LaunchedEffect(target) {
-        viewModel.setTarget(target)
-    }
+    val targetUser = state.targetUser
 
     var menuExpanded by remember {
         mutableStateOf(false)
     }
     BackHandler {
-        viewModel.readMessage()
-        navigationActions.navigateUp()
+        event(Event.NavigateUp)
     }
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -71,8 +69,9 @@ fun PairScreen(
                     SimpleListItem(
                         headlineContent = {
                             Text(text = targetUser?.username ?: "")
-                        }, supportingContent = {
-                            if (viewModel.online(target)) {
+                        },
+                        supportingContent = {
+                            if (messenger.online(state.target)) {
                                 Text(
                                     text = stringResource(id = R.string.online),
                                     color = MaterialTheme.colorScheme.primary
@@ -80,7 +79,8 @@ fun PairScreen(
                             } else {
                                 Text(text = stringResource(id = R.string.offline))
                             }
-                        }, leadingContent = {
+                        },
+                        leadingContent = {
                             AsyncImage(
                                 model = targetUser?.avatar,
                                 contentDescription = null,
@@ -92,18 +92,20 @@ fun PairScreen(
                             )
                         }
                     )
-                }, navigationIcon = {
-                    IconButton(onClick = {
-                        viewModel.readMessage()
-                        navigationActions.navigateUp()
-                    }) {
+                },
+                navigationIcon = {
+                    IconButton(
+                        onClick = {
+                            messenger.readMessage()
+                            event(Event.NavigateUp)
+                        }
+                    ) {
                         Icon(imageVector = Icons.Rounded.ArrowBack, contentDescription = null)
                     }
-                }, actions = {
-                    if (viewModel.ktor.uid != target) {
-                        IconButton(onClick = {
-                            viewModel.call()
-                        }) {
+                },
+                actions = {
+                    if (state.uid != state.target) {
+                        IconButton(onClick = { event(Event.Call) }) {
                             Icon(imageVector = Icons.Rounded.Call, contentDescription = null)
                         }
                     }
@@ -114,29 +116,48 @@ fun PairScreen(
                         expanded = menuExpanded,
                         onDismissRequest = { menuExpanded = false }
                     ) {
-                        viewState.menu.forEach {
+                        state.menu.forEach {
                             DropdownMenuItem(
                                 text = {
                                     Text(text = stringResource(id = it.text))
                                 },
                                 leadingIcon = {
                                     Icon(imageVector = it.icon, contentDescription = null)
-                                }, onClick = {
+                                },
+                                onClick = {
                                     menuExpanded = false
-                                    viewModel.onMenuClick(it)
+                                    event(Event.OnMenuClick(it))
                                 }
                             )
                         }
                     }
-                }, scrollBehavior = scrollBehavior
+                },
+                scrollBehavior = scrollBehavior
             )
         }
     ) {
         MessageColumn(
-            viewModel = viewModel,
+            messenger = messenger,
             modifier = Modifier.padding(top = it.calculateTopPadding()),
-            navigationActions = navigationActions,
-            messageViewModel = messageViewModel,
+            messageManager = messageManager,
+            action = action
+        )
+    }
+}
+
+@Composable
+@Previews
+private fun PairScreenPreview() {
+    PreviewSurface {
+        PairScreen(
+            state = State(
+                uid = 0,
+                target = 0
+            ),
+            event = {},
+            messenger = EmptyMessenger,
+            messageManager = EmptyMessageManager,
+            action = MessageAction()
         )
     }
 }

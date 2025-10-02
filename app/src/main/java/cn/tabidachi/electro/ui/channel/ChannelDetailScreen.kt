@@ -13,15 +13,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Output
 import androidx.compose.material.icons.rounded.PersonAdd
-import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -32,7 +32,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,26 +41,70 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.composable
 import cn.tabidachi.electro.R
-import cn.tabidachi.electro.ui.ElectroNavigationActions
+import cn.tabidachi.electro.model.EmptyMessenger
+import cn.tabidachi.electro.model.Messenger
+import cn.tabidachi.electro.ui.channel.ChannelContract.Event
+import cn.tabidachi.electro.ui.channel.ChannelContract.State
 import cn.tabidachi.electro.ui.common.ImageTopAppBar
+import cn.tabidachi.electro.ui.pair.navigateToPair
+import cn.tabidachi.electro.ui.preview.PreviewSurface
+import cn.tabidachi.electro.ui.preview.Previews
 import coil3.compose.AsyncImage
+import kotlinx.serialization.Serializable
+import moe.tabidachi.compose.mvi.observe
+
+@Serializable
+data object ChannelDetailRoute
+
+context(navController: NavHostController)
+fun NavGraphBuilder.channelDetail() = composable<ChannelDetailRoute> {
+    val viewModel: ChannelViewModel =
+        hiltViewModel(navController.getBackStackEntry(ChannelRoute::class))
+    val (state, event) = viewModel.observe {
+        when (it) {
+            ChannelContract.Effect.NavigateUp -> navController.navigateUp()
+        }
+    }
+    ChannelDetailScreen(
+        state = state.value,
+        event = {
+            when (it) {
+                is Event.NavigateToChannelAdmin -> navController.navigateToChannelAdmin()
+                is Event.NavigateToChannelDetail -> navController.navigateToChannelDetail()
+                is Event.NavigateToChannelEdit -> navController.navigateToChannelEdit()
+                is Event.NavigateToChannelInvite -> navController.navigateToChannelInvite()
+                is Event.NavigateToPair -> navController.navigateToPair(it.uid)
+                Event.NavigateUp -> navController.navigateUp()
+                else -> event(it)
+            }
+        },
+        messenger = viewModel.messenger
+    )
+}
+
+fun NavHostController.navigateToChannelDetail() {
+    navigate(ChannelDetailRoute)
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ChannelDetailScreen(
-    sid: Long,
-    navigationActions: ElectroNavigationActions,
-    viewModel: ChannelViewModel
+    state: State,
+    event: (Event) -> Unit,
+    messenger: Messenger
 ) {
-    val viewState by viewModel.viewState.collectAsState()
     var menuExpanded by remember {
         mutableStateOf(false)
     }
-    LaunchedEffect(key1 = Unit, block = {
-        viewModel.getSessionUser(sid)
-        viewModel.getSessionInfo(sid)
-    })
+    LaunchedEffect(Unit) {
+        event(Event.GetSessionUser)
+        event(Event.GetSessionInfo)
+    }
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
         topBar = {
@@ -69,31 +112,43 @@ fun ChannelDetailScreen(
                 title = {
                     Column {
                         Text(
-                            text = viewState.dialog?.title ?: "",
+                            text = state.dialog?.title ?: "",
                             maxLines = 1,
                             style = MaterialTheme.typography.bodyLarge
                         )
                         Text(
-                            text = stringResource(id = R.string.online_count, viewModel.online()),
+                            text = stringResource(id = R.string.online_count, messenger.online()),
                             maxLines = 1,
-                            style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         )
                     }
-                }, image = {
+                },
+                image = {
                     AsyncImage(
-                        model = viewState.dialog?.image,
+                        model = state.dialog?.image,
                         contentDescription = null,
                         contentScale = ContentScale.Crop
                     )
-                }, navigationIcon = {
-                    IconButton(onClick = navigationActions::navigateUp) {
-                        Icon(imageVector = Icons.Rounded.ArrowBack, contentDescription = null)
+                },
+                navigationIcon = {
+                    IconButton(
+                        onClick = { event(Event.NavigateUp) }
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = null
+                        )
                     }
-                }, actions = {
-                    if (viewState.isAdmin) {
-                        IconButton(onClick = {
-                            navigationActions.navigateToChannelEdit(sid)
-                        }) {
+                },
+                actions = {
+                    if (state.isAdmin) {
+                        IconButton(
+                            onClick = {
+                                messenger.sid.value?.let { event(Event.NavigateToChannelEdit(it)) }
+                            }
+                        ) {
                             Icon(imageVector = Icons.Rounded.Edit, contentDescription = null)
                         }
                     }
@@ -111,39 +166,47 @@ fun ChannelDetailScreen(
                                     imageVector = Icons.Rounded.Output,
                                     contentDescription = null
                                 )
-                            }, text = {
+                            },
+                            text = {
                                 Text(text = stringResource(id = R.string.leave_channel))
-                            }, onClick = {
-                                viewModel.exitGroup(sid, navigationActions::navigateUp)
+                            },
+                            onClick = {
+                                event(Event.ExitGroup)
                                 menuExpanded = false
                             }
                         )
                     }
-                }, scrollBehavior = scrollBehavior
+                },
+                scrollBehavior = scrollBehavior
             )
-        }, modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+        },
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
     ) {
         LazyColumn(
             contentPadding = PaddingValues(top = it.calculateTopPadding())
         ) {
             item {
-                Divider(thickness = 8.dp)
+                HorizontalDivider(thickness = 8.dp)
                 Column(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     ListItem(
                         headlineContent = {
                             Text(text = stringResource(id = R.string.add_members))
-                        }, leadingContent = {
+                        },
+                        leadingContent = {
                             Icon(imageVector = Icons.Rounded.PersonAdd, contentDescription = null)
-                        }, modifier = Modifier
+                        },
+                        modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                navigationActions.navigateToChannelInvite(sid)
+                                messenger.sid.value?.let {
+                                    event(Event.NavigateToChannelInvite(it))
+                                }
                             }
                     )
                 }
-                Divider(thickness = 8.dp)
+                HorizontalDivider(thickness = 8.dp)
             }
             stickyHeader {
                 ListItem(
@@ -154,19 +217,24 @@ fun ChannelDetailScreen(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
-                    }, trailingContent = {
-                        if (viewState.isAdmin) {
-                            IconButton(onClick = {
-                                navigationActions.navigateToChannelAdmin(sid)
-                            }) {
+                    },
+                    trailingContent = {
+                        if (state.isAdmin) {
+                            IconButton(
+                                onClick = {
+                                    messenger.sid.value?.let {
+                                        event(Event.NavigateToChannelAdmin(it))
+                                    }
+                                }
+                            ) {
                                 Icon(imageVector = Icons.Rounded.Edit, contentDescription = null)
                             }
                         }
                     }
                 )
-                Divider()
+                HorizontalDivider()
             }
-            items(viewState.users) {
+            items(state.users) {
                 ListItem(
                     leadingContent = {
                         Surface(
@@ -178,16 +246,21 @@ fun ChannelDetailScreen(
                     },
                     headlineContent = {
                         Text(text = it.username)
-                    }, supportingContent = {
-                        if (viewModel.online(it.uid)) {
-                            Text(text = stringResource(id = R.string.online), color = MaterialTheme.colorScheme.primary)
+                    },
+                    supportingContent = {
+                        if (messenger.online(it.uid)) {
+                            Text(
+                                text = stringResource(id = R.string.online),
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         } else {
                             Text(text = stringResource(id = R.string.offline))
                         }
-                    }, modifier = Modifier
+                    },
+                    modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
-                            navigationActions.navigateToPair(it.uid)
+                            event(Event.NavigateToPair(it.uid))
                         }
                 )
             }
@@ -195,5 +268,17 @@ fun ChannelDetailScreen(
                 Spacer(modifier = Modifier.navigationBarsPadding())
             }
         }
+    }
+}
+
+@Previews
+@Composable
+private fun ChannelDetailScreenPreview() {
+    PreviewSurface {
+        ChannelDetailScreen(
+            state = State(),
+            event = {},
+            messenger = EmptyMessenger
+        )
     }
 }

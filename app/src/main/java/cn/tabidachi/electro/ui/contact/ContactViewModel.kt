@@ -2,52 +2,57 @@ package cn.tabidachi.electro.ui.contact
 
 import androidx.lifecycle.viewModelScope
 import cn.tabidachi.electro.data.Repository
-import cn.tabidachi.electro.data.database.entity.User
 import cn.tabidachi.electro.data.network.Ktor
+import cn.tabidachi.electro.model.BaseMessenger
 import cn.tabidachi.electro.model.Messenger
+import cn.tabidachi.electro.ui.contact.ContactContract.State
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class ContactViewModel @Inject constructor(
-    override val repository: Repository,
-    override val ktor: Ktor
-) : Messenger(repository, ktor) {
-    private val _viewState = MutableStateFlow(ContactViewState())
-    val viewState = _viewState.asStateFlow()
+    private val repository: Repository,
+    private val ktor: Ktor,
+) : ContactContract.ViewModel(State()) {
+    val messenger: Messenger = BaseMessenger(
+        repository = repository,
+        ktor = ktor,
+        scope = viewModelScope,
+        sid = 0,
+    )
 
-    fun getContact() {
+    override fun event(event: ContactContract.Event) {
+        when (event) {
+            is ContactContract.Event.ChangeSearchState -> changeSearchState(event.value)
+            ContactContract.Event.GetContact -> getContact()
+            is ContactContract.Event.NavigateToPair -> Unit
+            ContactContract.Event.NavigateUp -> Unit
+            is ContactContract.Event.OnQueryValueChange -> onQueryValueChange(event.value)
+            ContactContract.Event.OnSearch -> onSearch()
+        }
+    }
+
+    private fun getContact() {
         viewModelScope.launch {
             repository.contact().onSuccess {
                 it.data?.mapNotNull {
                     repository.getUser(it).getOrNull()?.data
                 }?.let { users ->
-                    _viewState.update { it.copy(users = users) }
+                    updateState { it.copy(users = users) }
                 }
             }
         }
     }
 
-    fun onSearch() {
-
+    private fun onSearch() {
     }
 
-    fun changeSearchState(isSearch: Boolean) {
-        _viewState.update { it.copy(isSearch = isSearch, filter = "") }
+    private fun changeSearchState(isSearch: Boolean) {
+        updateState { it.copy(isSearch = isSearch, filter = "") }
     }
 
-    fun onQueryValueChange(value: String) {
-        _viewState.update { it.copy(filter = value) }
+    private fun onQueryValueChange(value: String) {
+        updateState { it.copy(filter = value) }
     }
 }
-
-data class ContactViewState(
-    val filter: String = "",
-    val isSearch: Boolean = false,
-    val users: List<User> = emptyList(),
-    val filterUser: List<User> = emptyList()
-)

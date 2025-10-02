@@ -149,6 +149,10 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget = JvmTarget.JVM_17
+        freeCompilerArgs = listOf(
+            "-Xcontext-parameters",
+            "-XXLanguage:+PropertyParamAnnotationDefaultTargetMode"
+        )
     }
 }
 
@@ -181,6 +185,9 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.webrtc.android)
     implementation(libs.kotlinx.serialization.json)
+    implementation(project(":compose-mvi"))
+    runtimeOnly("stax:stax-api:1.0.1")
+    runtimeOnly("stax:stax:1.2.0")
     // test
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.ext.junit)

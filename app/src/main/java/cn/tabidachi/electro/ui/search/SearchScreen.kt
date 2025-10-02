@@ -27,8 +27,8 @@ import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,8 +47,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -58,14 +56,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import cn.tabidachi.electro.R
 import cn.tabidachi.electro.data.database.entity.Dialog
 import cn.tabidachi.electro.data.database.entity.SessionSearch
 import cn.tabidachi.electro.data.database.entity.SessionType
 import cn.tabidachi.electro.model.UserQuery
-import cn.tabidachi.electro.ui.ElectroNavigationActions
 import cn.tabidachi.electro.ui.common.SearchTextField
+import cn.tabidachi.electro.ui.preview.PreviewSurface
+import cn.tabidachi.electro.ui.preview.Previews
+import cn.tabidachi.electro.ui.search.SearchContract.Event
+import cn.tabidachi.electro.ui.search.SearchContract.State
 import coil3.compose.AsyncImage
 import com.google.accompanist.pager.pagerTabIndicatorOffset
 import kotlinx.coroutines.launch
@@ -73,7 +73,8 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun SearchScreen(
-    navigationActions: ElectroNavigationActions
+    state: State,
+    event: (Event) -> Unit
 ) {
     val pagerState = rememberPagerState(
         initialPage = 0,
@@ -82,31 +83,37 @@ fun SearchScreen(
         SearchTab.entries.size
     }
     val scope = rememberCoroutineScope()
-    val viewModel: SearchViewModel = hiltViewModel()
-    val viewState by viewModel.viewState.collectAsState()
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     SearchTextField(
-                        value = viewState.query,
-                        onValueChange = viewModel::queryValueChange,
+                        value = state.query,
+                        onValueChange = {
+                            event(Event.QueryValueChange(it))
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = {
                             Text(text = stringResource(id = R.string.search))
-                        }, onSearch = {
-                            viewModel.onSearch()
+                        },
+                        onSearch = {
+                            event(Event.OnSearch)
                         }
                     )
-                }, navigationIcon = {
-                    IconButton(onClick = navigationActions::navigateUp) {
-                        Icon(imageVector = Icons.Rounded.ArrowBack, contentDescription = null)
+                },
+                navigationIcon = {
+                    IconButton(onClick = { event(Event.NavigateUp) }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = null
+                        )
                     }
-                }, actions = {
-                    AnimatedVisibility(visible = viewState.query.isNotEmpty()) {
-                        IconButton(onClick = {
-                            viewModel.queryValueChange("")
-                        }) {
+                },
+                actions = {
+                    AnimatedVisibility(visible = state.query.isNotEmpty()) {
+                        IconButton(
+                            onClick = { event(Event.QueryValueChange("")) }
+                        ) {
                             Icon(imageVector = Icons.Rounded.Clear, contentDescription = null)
                         }
                     }
@@ -156,34 +163,34 @@ fun SearchScreen(
                 ),
                 pageContent = {
                     when (SearchTab.entries[it]) {
-                        SearchTab.DIALOG -> when (val state = viewState.dialogs) {
+                        SearchTab.DIALOG -> when (val state = state.dialogs) {
                             DialogSearchState.Failure -> {}
                             DialogSearchState.None -> None()
-                            is DialogSearchState.Success -> Dialogs(state.value, navigationActions)
+                            is DialogSearchState.Success -> Dialogs(state.value, event)
                         }
 
-                        SearchTab.GROUP -> when (val state = viewState.groups) {
+                        SearchTab.GROUP -> when (val state = state.groups) {
                             SessionSearchState.Failure -> {}
                             SessionSearchState.None -> None()
                             is SessionSearchState.Success -> Groups(
                                 state.value,
-                                viewModel::onGroupJoinRequest
+                                { event(Event.OnGroupJoinRequest(it)) }
                             )
                         }
 
-                        SearchTab.CHANNEL -> when (val state = viewState.channels) {
+                        SearchTab.CHANNEL -> when (val state = state.channels) {
                             SessionSearchState.Failure -> {}
                             SessionSearchState.None -> None()
                             is SessionSearchState.Success -> Channels(
                                 state.value,
-                                viewModel::onGroupJoinRequest
+                                { event(Event.OnGroupJoinRequest(it)) }
                             )
                         }
 
-                        SearchTab.USER -> when (val state = viewState.users) {
+                        SearchTab.USER -> when (val state = state.users) {
                             UserSearchState.Failure -> {}
                             UserSearchState.None -> None()
-                            is UserSearchState.Success -> Users(state.value, navigationActions)
+                            is UserSearchState.Success -> Users(state.value, event)
                         }
                     }
                 }
@@ -215,7 +222,7 @@ fun NotFound() {
 @Composable
 fun Dialogs(
     dialogs: List<Dialog>,
-    navigationActions: ElectroNavigationActions
+    event: (Event) -> Unit
 ) {
     AnimatedVisibility(visible = dialogs.isEmpty()) {
         NotFound()
@@ -229,7 +236,8 @@ fun Dialogs(
             ListItem(
                 headlineContent = {
                     Text(text = it.title ?: "", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }, leadingContent = {
+                },
+                leadingContent = {
                     AsyncImage(
                         model = it.image,
                         contentDescription = null,
@@ -237,21 +245,21 @@ fun Dialogs(
                             .size(48.dp)
                             .clip(CircleShape)
                     )
-                }, supportingContent = {
+                },
+                supportingContent = {
                     Text(text = it.subtitle ?: "", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }, modifier = Modifier.clickable {
+                },
+                modifier = Modifier.clickable {
                     when (it.type) {
                         SessionType.NONE -> {
-
                         }
 
                         SessionType.P2P -> {
-                            it.extras?.toLong()
-                                ?.let { it1 -> navigationActions.navigateToPair(it1) }
+                            it.extras?.toLong()?.let { event(Event.NavigateToPair(it)) }
                         }
 
                         SessionType.ROOM -> {
-                            navigationActions.navigateToGroup(it.sid)
+                            event(Event.NavigateToGroup(it.sid))
                         }
 
                         SessionType.CHANNEL -> {}
@@ -318,7 +326,8 @@ fun Groups(
                                     text = current?.title ?: "",
                                     style = MaterialTheme.typography.titleLarge
                                 )
-                            }, supportingContent = {
+                            },
+                            supportingContent = {
                                 Column {
                                     Text(
                                         text = stringResource(
@@ -340,7 +349,8 @@ fun Groups(
                     OutlinedButton(
                         onClick = {
                             current?.sid?.let(onJoinRequest)
-                        }, contentPadding = PaddingValues(8.dp),
+                        },
+                        contentPadding = PaddingValues(8.dp),
                         shape = MaterialTheme.shapes.small
                     ) {
                         Icon(imageVector = Icons.Rounded.Add, contentDescription = null)
@@ -352,7 +362,8 @@ fun Groups(
                     onValueChange = { },
                     label = {
                         Text(text = stringResource(id = R.string.group_description))
-                    }, modifier = Modifier.fillMaxWidth(),
+                    },
+                    modifier = Modifier.fillMaxWidth(),
                     readOnly = true
                 )
             }
@@ -367,7 +378,8 @@ fun Groups(
                 ListItem(
                     headlineContent = {
                         Text(text = it.title ?: "", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }, leadingContent = {
+                    },
+                    leadingContent = {
                         AsyncImage(
                             model = it.image,
                             contentDescription = null,
@@ -375,7 +387,8 @@ fun Groups(
                                 .size(48.dp)
                                 .clip(CircleShape)
                         )
-                    }, modifier = Modifier
+                    },
+                    modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
                             scope.launch {
@@ -384,10 +397,14 @@ fun Groups(
                             }
                         },
                     supportingContent = {
-                        Text(text = it.description.takeIf { !it.isNullOrBlank() } ?: stringResource(
-                            id = R.string.group_id,
-                            "${it.sid}"
-                        ), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            text = it.description.takeIf { !it.isNullOrBlank() } ?: stringResource(
+                                id = R.string.group_id,
+                                "${it.sid}"
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 )
             }
@@ -397,7 +414,6 @@ fun Groups(
         }
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -452,7 +468,8 @@ fun Channels(
                                     text = current?.title ?: "",
                                     style = MaterialTheme.typography.titleLarge
                                 )
-                            }, supportingContent = {
+                            },
+                            supportingContent = {
                                 Column {
                                     Text(
                                         text = stringResource(
@@ -474,7 +491,8 @@ fun Channels(
                     OutlinedButton(
                         onClick = {
                             current?.sid?.let(onJoinRequest)
-                        }, contentPadding = PaddingValues(8.dp),
+                        },
+                        contentPadding = PaddingValues(8.dp),
                         shape = MaterialTheme.shapes.small
                     ) {
                         Icon(imageVector = Icons.Rounded.Add, contentDescription = null)
@@ -486,7 +504,8 @@ fun Channels(
                     onValueChange = { },
                     label = {
                         Text(text = stringResource(id = R.string.channel_description))
-                    }, modifier = Modifier.fillMaxWidth(),
+                    },
+                    modifier = Modifier.fillMaxWidth(),
                     readOnly = true
                 )
             }
@@ -501,7 +520,8 @@ fun Channels(
                 ListItem(
                     headlineContent = {
                         Text(text = it.title ?: "", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }, leadingContent = {
+                    },
+                    leadingContent = {
                         AsyncImage(
                             model = it.image,
                             contentDescription = null,
@@ -509,7 +529,8 @@ fun Channels(
                                 .size(48.dp)
                                 .clip(CircleShape)
                         )
-                    }, modifier = Modifier
+                    },
+                    modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
                             scope.launch {
@@ -518,10 +539,14 @@ fun Channels(
                             }
                         },
                     supportingContent = {
-                        Text(text = it.description.takeIf { !it.isNullOrBlank() } ?: stringResource(
-                            id = R.string.group_id,
-                            "${it.sid}"
-                        ), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            text = it.description.takeIf { !it.isNullOrBlank() } ?: stringResource(
+                                id = R.string.group_id,
+                                "${it.sid}"
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 )
             }
@@ -535,7 +560,7 @@ fun Channels(
 @Composable
 fun Users(
     users: List<UserQuery>,
-    navigationActions: ElectroNavigationActions,
+    event: (Event) -> Unit
 ) {
     AnimatedVisibility(visible = users.isEmpty()) {
         NotFound()
@@ -549,7 +574,8 @@ fun Users(
             ListItem(
                 headlineContent = {
                     Text(text = it.username)
-                }, leadingContent = {
+                },
+                leadingContent = {
                     AsyncImage(
                         model = it.avatar,
                         contentDescription = null,
@@ -557,12 +583,14 @@ fun Users(
                             .size(48.dp)
                             .clip(CircleShape)
                     )
-                }, supportingContent = {
+                },
+                supportingContent = {
                     Text(text = "uid: ${it.uid}")
-                }, modifier = Modifier
+                },
+                modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
-                        navigationActions.navigateToPair(it.uid)
+                        event(Event.NavigateToPair(it.uid))
                     }
             )
         }
@@ -577,4 +605,30 @@ enum class SearchTab(@StringRes val text: Int) {
     GROUP(R.string.groups),
     CHANNEL(R.string.channels),
     USER(R.string.users)
+}
+
+@Composable
+@Previews
+private fun SearchScreenPreview() {
+    PreviewSurface {
+        SearchScreen(
+            state = State(
+                currentTab = SearchTab.GROUP,
+                groups = SessionSearchState.Success(
+                    List(10) {
+                        SessionSearch(
+                            1919,
+                            SessionType.ROOM,
+                            "Group $it",
+                            "Group $it Description",
+                            "",
+                            0,
+                            810
+                        )
+                    }
+                )
+            ),
+            event = {}
+        )
+    }
 }

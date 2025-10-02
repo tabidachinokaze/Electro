@@ -1,10 +1,7 @@
 package cn.tabidachi.electro.ui.settings
 
 import android.Manifest
-import android.content.Intent
-import android.net.Uri
 import android.os.Build
-import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
@@ -39,7 +36,7 @@ fun LazyListScope.Permissions() {
     item {
         val context = LocalContext.current
         SettingsCategory(stringResource(id = R.string.permissions)) {
-            Permissions.values().forEach {
+            Permissions.entries.forEach {
                 val permissionState =
                     rememberPermissionState(permission = it.permission)
                 val launcher = rememberLauncherForActivityResult(
@@ -56,7 +53,8 @@ fun LazyListScope.Permissions() {
                         if (!permissionState.status.isGranted) {
                             launcher.launch(it.permission)
                         }
-                    }, hasPermission = permissionState.status.isGranted
+                    },
+                    hasPermission = permissionState.status.isGranted
                 )
             }
         }
@@ -105,14 +103,17 @@ fun PermissionItem(
     ListItem(
         headlineContent = {
             Text(text = stringResource(id = permissions.title))
-        }, supportingContent = {
+        },
+        supportingContent = {
             Text(text = stringResource(id = permissions.description))
-        }, leadingContent = {
+        },
+        leadingContent = {
             Icon(
                 imageVector = permissions.icon,
                 contentDescription = null,
             )
-        }, trailingContent = {
+        },
+        trailingContent = {
             if (hasPermission) {
                 Icon(
                     imageVector = Icons.Rounded.CheckCircle,
@@ -126,6 +127,7 @@ fun PermissionItem(
                     tint = MaterialTheme.colorScheme.error
                 )
             }
-        }, modifier = modifier
+        },
+        modifier = modifier
     )
 }

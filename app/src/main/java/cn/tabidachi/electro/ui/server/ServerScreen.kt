@@ -18,23 +18,27 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import cn.tabidachi.electro.ui.preview.PreviewSurface
+import cn.tabidachi.electro.ui.preview.Previews
+import cn.tabidachi.electro.ui.server.ServerContract.Action
+import cn.tabidachi.electro.ui.server.ServerContract.State
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ServerScreen(
-    state: ServerState,
-    actions: ServerActions,
+    state: State,
+    action: Action,
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(text = "服务器地址设置")
-                }, navigationIcon = {
+                },
+                navigationIcon = {
                     IconButton(
-                        onClick = actions.onNavigateUp
+                        onClick = action.onNavigateUp
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
@@ -57,19 +61,23 @@ fun ServerScreen(
             ListItem(
                 headlineContent = {
                     Text(text = "服务器地址")
-                }, supportingContent = {
+                },
+                supportingContent = {
                     Text(text = state.url)
-                }, modifier = Modifier.clickable {
-                    actions.showDialog(ServerDialogType.ElectroUrl)
+                },
+                modifier = Modifier.clickable {
+                    action.showDialog(ServerDialogType.ElectroUrl)
                 }
             )
             ListItem(
                 headlineContent = {
                     Text(text = "端口")
-                }, supportingContent = {
+                },
+                supportingContent = {
                     Text(text = state.port)
-                }, modifier = Modifier.clickable {
-                    actions.showDialog(ServerDialogType.ElectroPort)
+                },
+                modifier = Modifier.clickable {
+                    action.showDialog(ServerDialogType.ElectroPort)
                 }
             )
             Text(
@@ -81,49 +89,58 @@ fun ServerScreen(
             ListItem(
                 headlineContent = {
                     Text(text = "服务器地址")
-                }, supportingContent = {
+                },
+                supportingContent = {
                     Text(text = state.minioUrl)
-                }, modifier = Modifier.clickable {
-                    actions.showDialog(ServerDialogType.MinioUrl)
+                },
+                modifier = Modifier.clickable {
+                    action.showDialog(ServerDialogType.MinioUrl)
                 }
             )
             ListItem(
                 headlineContent = {
                     Text(text = "端口")
-                }, supportingContent = {
+                },
+                supportingContent = {
                     Text(text = state.minioPort)
-                }, modifier = Modifier.clickable {
-                    actions.showDialog(ServerDialogType.MinioPort)
+                },
+                modifier = Modifier.clickable {
+                    action.showDialog(ServerDialogType.MinioPort)
                 }
             )
         }
     }
-    if (state.dialogVisible) AlertDialog(
-        onDismissRequest = actions.hideDialog,
-        confirmButton = {
-            TextButton(
-                onClick = actions.onSave
-            ) {
-                Text(text = "保存")
-            }
-        }, dismissButton = {
-            TextButton(
-                onClick = actions.hideDialog
-            ) {
-                Text(text = "取消")
-            }
-        }, title = {
-            Text(text = state.dialogType.title)
-        }, text = {
-            OutlinedTextField(
-                value = state.dialogValue,
-                onValueChange = actions.onDialogValueChange,
-                label = {
-                    Text(text = state.dialogType.label)
+    if (state.dialogVisible) {
+        AlertDialog(
+            onDismissRequest = action.hideDialog,
+            confirmButton = {
+                TextButton(
+                    onClick = action.onSave
+                ) {
+                    Text(text = "保存")
                 }
-            )
-        }
-    )
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = action.hideDialog
+                ) {
+                    Text(text = "取消")
+                }
+            },
+            title = {
+                Text(text = state.dialogType.title)
+            },
+            text = {
+                OutlinedTextField(
+                    value = state.dialogValue,
+                    onValueChange = action.onDialogValueChange,
+                    label = {
+                        Text(text = state.dialogType.label)
+                    }
+                )
+            }
+        )
+    }
 }
 
 enum class ServerDialogType(
@@ -137,18 +154,19 @@ enum class ServerDialogType(
 }
 
 @Composable
-@Preview(name = "Server")
+@Previews
 private fun ServerScreenPreview() {
-    ServerScreen(
-        state = ServerState(
-            url = "http://electro.tabidachi.moe",
-            port = "23333",
-            minioUrl = "http://minio.tabidachi.moe",
-            minioPort = "9000",
-            dialogVisible = true,
-            dialogValue = "http://www.tabidachi.moe"
-        ),
-        actions = ServerActions()
-    )
+    PreviewSurface {
+        ServerScreen(
+            state = State(
+                url = "http://electro.tabidachi.moe",
+                port = "23333",
+                minioUrl = "http://minio.tabidachi.moe",
+                minioPort = "9000",
+                dialogVisible = true,
+                dialogValue = "http://www.tabidachi.moe"
+            ),
+            action = Action()
+        )
+    }
 }
-

@@ -1,6 +1,6 @@
 package cn.tabidachi.electro.data.network
 
-import android.app.Application
+import android.content.Context
 import android.util.Log
 import cn.tabidachi.electro.BuildConfig
 import cn.tabidachi.electro.data.database.entity.Message
@@ -44,7 +44,6 @@ import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.forms.submitFormWithBinaryData
 import io.ktor.client.request.get
-import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -53,7 +52,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.URLBuilder
 import io.ktor.http.URLProtocol
-import io.ktor.http.contentType
 import io.ktor.http.encodeURLParameter
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteReadChannel
@@ -61,8 +59,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
@@ -71,17 +67,19 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.nio.charset.Charset
 
 class Ktor(
-    private val application: Application,
+    private val context: Context,
     val host: String = BuildConfig.ELECTRO_SERVER_HOST,
     val port: Int = URLProtocol.ELECTRO.defaultPort,
 ) {
     val okHttpClient = OkHttpClient()
     val client: HttpClient = HttpClient(CIO) {
         install(ContentNegotiation) {
-            json(json = Json {
-                prettyPrint = true
-                isLenient = true
-            })
+            json(
+                json = Json {
+                    prettyPrint = true
+                    isLenient = true
+                }
+            )
         }
         install(WebSockets)
         defaultRequest {
@@ -89,7 +87,7 @@ class Ktor(
             this.port = this@Ktor.port
         }
         install(HttpCache) {
-            publicStorage(FileStorage(application.cacheDir!!))
+            publicStorage(FileStorage(context.cacheDir!!))
         }
     }
 
@@ -210,7 +208,7 @@ class Ktor(
                 contentType(ContentType.Application.Json)
                 setBody(body)
             }
-            */
+             */
         }.onFailure {
             Log.e(TAG, "post: $url", it)
         }.mapCatching {
@@ -393,17 +391,21 @@ class Ktor(
 
     suspend fun queryUser(query: String): Result<Response<List<UserQuery>>> {
         return get<List<UserQuery>>("/user/query/${query.encodeURLParameter()}").map {
-            it.copy(data = it.data?.map {
-                it.copy(avatar = convert(it.avatar).buildString())
-            })
+            it.copy(
+                data = it.data?.map {
+                    it.copy(avatar = convert(it.avatar).buildString())
+                }
+            )
         }
     }
 
     suspend fun getUser(target: Long): Result<Response<User>> {
         return get<User>("/user/$target").map {
-            it.copy(data = it.data?.let {
-                it.copy(avatar = convert(it.avatar).buildString())
-            })
+            it.copy(
+                data = it.data?.let {
+                    it.copy(avatar = convert(it.avatar).buildString())
+                }
+            )
         }
     }
 
@@ -467,19 +469,19 @@ class Ktor(
     }
 
     suspend fun addContact(target: Long): Result<Response<Boolean>> {
-        return post("/relation/${target}/contact")
+        return post("/relation/$target/contact")
     }
 
     suspend fun deleteContact(target: Long): Result<Response<Boolean>> {
-        return delete("/relation/${target}/contact")
+        return delete("/relation/$target/contact")
     }
 
     suspend fun blockUser(target: Long): Result<Response<Boolean>> {
-        return post("/relation/${target}/block")
+        return post("/relation/$target/block")
     }
 
     suspend fun unblockUser(target: Long): Result<Response<Boolean>> {
-        return delete("/relation/${target}/block")
+        return delete("/relation/$target/block")
     }
 
     suspend fun contact(): Result<Response<List<Long>>> {

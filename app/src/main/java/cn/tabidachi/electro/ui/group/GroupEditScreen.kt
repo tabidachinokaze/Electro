@@ -33,8 +33,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,24 +43,64 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.composable
 import cn.tabidachi.electro.R
-import cn.tabidachi.electro.ui.ElectroNavigationActions
 import cn.tabidachi.electro.ui.common.SimpleTextField
+import cn.tabidachi.electro.ui.group.GroupContract.Event
+import cn.tabidachi.electro.ui.group.GroupContract.State
+import cn.tabidachi.electro.ui.pair.navigateToPair
+import cn.tabidachi.electro.ui.preview.PreviewSurface
+import cn.tabidachi.electro.ui.preview.Previews
 import coil3.compose.AsyncImage
 import com.mr0xf00.easycrop.CropResult
 import com.mr0xf00.easycrop.crop
 import com.mr0xf00.easycrop.rememberImageCropper
 import com.mr0xf00.easycrop.ui.ImageCropperDialog
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import moe.tabidachi.compose.mvi.observe
+
+@Serializable
+data object GroupEditRoute
+
+context(navController: NavHostController)
+fun NavGraphBuilder.groupEdit() = composable<GroupEditRoute> {
+    val viewModel: GroupViewModel =
+        hiltViewModel(navController.getBackStackEntry(GroupRoute::class))
+    val (state, event) = viewModel.observe {
+        when (it) {
+            GroupContract.Effect.NavigateUp -> navController.navigateUp()
+        }
+    }
+    GroupEditScreen(
+        state = state.value,
+        event = {
+            when (it) {
+                is Event.NavigateToChannelAdmin -> navController.navigateToGroupAdmin()
+                is Event.NavigateToChannelDetail -> navController.navigateToGroupDetail()
+                is Event.NavigateToChannelEdit -> navController.navigateToGroupEdit()
+                is Event.NavigateToChannelInvite -> navController.navigateToGroupInvite()
+                is Event.NavigateToPair -> navController.navigateToPair(it.uid)
+                Event.NavigateUp -> navController.navigateUp()
+                else -> event(it)
+            }
+        }
+    )
+}
+
+fun NavHostController.navigateToGroupEdit() {
+    navigate(GroupEditRoute)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CroupEditScreen(
-    sid: Long,
-    navigationActions: ElectroNavigationActions,
-    viewModel: GroupViewModel,
+fun GroupEditScreen(
+    state: State,
+    event: (Event) -> Unit
 ) {
-    val viewState by viewModel.viewState.collectAsState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val cropper = rememberImageCropper()
@@ -74,11 +112,10 @@ fun CroupEditScreen(
                 scope.launch {
                     when (val cropResult = cropper.crop(it, context)) {
                         is CropResult.Success -> {
-                            viewModel.onCropSuccess(cropResult.bitmap.asAndroidBitmap())
+                            event(Event.OnCropSuccess(cropResult.bitmap.asAndroidBitmap()))
                         }
 
                         else -> {
-
                         }
                     }
                 }
@@ -88,9 +125,9 @@ fun CroupEditScreen(
     cropper.cropState?.let {
         ImageCropperDialog(state = it)
     }
-    LaunchedEffect(key1 = Unit, block = {
-        viewModel.findSession()
-    })
+    LaunchedEffect(Unit) {
+        event(Event.FindSession)
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -99,29 +136,35 @@ fun CroupEditScreen(
                 },
                 navigationIcon = {
                     IconButton(
-                        onClick = navigationActions::navigateUp
+                        onClick = {
+                            event(Event.NavigateUp)
+                        }
                     ) {
                         Icon(imageVector = Icons.Rounded.ArrowBack, contentDescription = null)
                     }
                 },
             )
-        }, floatingActionButton = {
+        },
+        floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    viewModel.onDone {
-                        navigationActions.navigateUp()
-                    }
-                }, modifier = Modifier
+                    event(Event.OnDone)
+                },
+                modifier = Modifier
                     .imePadding()
                     .navigationBarsPadding()
             ) {
-                if (viewState.processing) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeCap = StrokeCap.Round)
+                if (state.processing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeCap = StrokeCap.Round
+                    )
                 } else {
                     Icon(imageVector = Icons.Rounded.Done, contentDescription = null)
                 }
             }
-        }, contentWindowInsets = WindowInsets.statusBars
+        },
+        contentWindowInsets = WindowInsets.statusBars
     ) {
         Column(
             modifier = Modifier
@@ -147,39 +190,56 @@ fun CroupEditScreen(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    viewState.image?.let {
+                    state.image?.let {
                         AsyncImage(
                             model = it,
                             contentDescription = null,
                             contentScale = ContentScale.Crop
                         )
-                    } ?: viewState.dialog?.image?.let {
+                    } ?: state.dialog?.image?.let {
                         AsyncImage(
                             model = it,
                             contentDescription = null,
                             contentScale = ContentScale.Crop
                         )
-                    } ?: kotlin.run {
+                    } ?: run {
                         Image(imageVector = Icons.Rounded.AddAPhoto, contentDescription = null)
                     }
                 }
                 SimpleTextField(
-                    value = viewState.title,
-                    onValueChange = viewModel::onTitleChange,
+                    value = state.title,
+                    onValueChange = {
+                        event(Event.OnTitleChange(it))
+                    },
                     modifier = Modifier.weight(1f),
                     maxLines = 4,
                     placeholder = {
                         Text(text = stringResource(id = R.string.group_name))
-                    }, isError = viewState.isTitleError
+                    },
+                    isError = state.isTitleError
                 )
             }
             OutlinedTextField(
-                value = viewState.description,
-                onValueChange = viewModel::onDescriptionChange,
+                value = state.description,
+                onValueChange = {
+                    event(Event.OnDescriptionChange(it))
+                },
                 label = {
                     Text(text = stringResource(id = R.string.group_description))
-                }, modifier = Modifier.fillMaxWidth()
+                },
+                modifier = Modifier.fillMaxWidth()
             )
         }
+    }
+}
+
+@Composable
+@Previews
+private fun GroupEditScreenPreview() {
+    PreviewSurface {
+        GroupEditScreen(
+            state = State(),
+            event = {}
+        )
     }
 }

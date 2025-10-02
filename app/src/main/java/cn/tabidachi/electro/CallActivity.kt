@@ -10,8 +10,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.WindowCompat
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.rememberNavController
 import cn.tabidachi.electro.ext.checkPermission
-import cn.tabidachi.electro.ui.call.CallScreen
+import cn.tabidachi.electro.ui.call.CallRoute
+import cn.tabidachi.electro.ui.call.call
 import cn.tabidachi.electro.ui.theme.ElectroTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -24,11 +27,11 @@ class CallActivity : ComponentActivity() {
             finishAndRemoveTask()
             return
         }
-        val src = intent?.getStringExtra("src")?.toLong() ?: kotlin.run {
+        val src = intent?.getStringExtra("src")?.toLong() ?: run {
             finishAndRemoveTask()
             return
         }
-        val dst = intent?.getStringExtra("dst")?.toLong() ?: kotlin.run {
+        val dst = intent?.getStringExtra("dst")?.toLong() ?: run {
             finishAndRemoveTask()
             return
         }
@@ -44,7 +47,7 @@ class CallActivity : ComponentActivity() {
                 ANSWER_ACTION
             }
 
-            else -> kotlin.run {
+            else -> run {
                 finishAndRemoveTask()
                 return
             }
@@ -56,14 +59,16 @@ class CallActivity : ComponentActivity() {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    CallScreen(
-                        offer = src,
-                        answer = dst,
-                        action = action,
-                        onCallEnd = {
-                            finishAndRemoveTask()
-                        }
-                    )
+                    NavHost(
+                        navController = rememberNavController(),
+                        startDestination = CallRoute(
+                            offer = src,
+                            answer = dst,
+                            action = action
+                        )
+                    ) {
+                        call()
+                    }
                 }
             }
         }

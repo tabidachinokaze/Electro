@@ -5,21 +5,21 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Language
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.Text
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import cn.tabidachi.electro.R
+import cn.tabidachi.electro.ui.settings.SettingsContract.Event
+import cn.tabidachi.electro.ui.settings.SettingsContract.State
 import cn.tabidachi.electro.ui.settings.components.SettingsCategory
 
-fun LazyListScope.Languages(viewModel: SettingsViewModel) {
+fun LazyListScope.Languages(
+    state: State,
+    event: (Event) -> Unit
+) {
     item {
-        val viewState by viewModel.viewState.collectAsState()
         SettingsCategory(stringResource(id = R.string.languages)) {
             ListItem(
                 leadingContent = {
@@ -27,28 +27,15 @@ fun LazyListScope.Languages(viewModel: SettingsViewModel) {
                         imageVector = Icons.Rounded.Language,
                         contentDescription = null
                     )
-                }, headlineContent = {
+                },
+                headlineContent = {
                     Text(text = stringResource(id = R.string.languages))
-                }, supportingContent = {
-                    Text(text = stringResource(id = viewModel.language.text))
-                    DropdownMenu(
-                        expanded = viewState.isLanguageMenuExpanded,
-                        onDismissRequest = {
-                            viewModel.onLanguageMenuVisible(false)
-                        }) {
-                        Language.values().forEach {
-                            DropdownMenuItem(
-                                text = {
-                                    Text(text = stringResource(id = it.text))
-                                }, onClick = {
-                                    viewModel.onLanguageChange(it)
-                                    viewModel.onLanguageMenuVisible(false)
-                                }
-                            )
-                        }
-                    }
-                }, modifier = Modifier.clickable {
-                    viewModel.onLanguageMenuVisible(true)
+                },
+                supportingContent = {
+                    Text(text = stringResource(id = state.language.text))
+                },
+                modifier = Modifier.clickable {
+                    event(Event.NavigateToLocaleSettings)
                 }
             )
         }

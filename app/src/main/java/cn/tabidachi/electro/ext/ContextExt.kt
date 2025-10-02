@@ -6,6 +6,7 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
@@ -69,7 +70,6 @@ fun Context.toast(text: String, duration: Int = Toast.LENGTH_SHORT) {
     Toast.makeText(this, text, duration).show()
 }
 
-
 fun Context.applicationSettings() {
     val intent = Intent()
     intent.action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
@@ -100,4 +100,16 @@ tailrec fun Context.findActivity(): Activity? {
 
         else -> null
     }
+}
+
+fun Context.navigateToLocaleSettings() {
+    val intent =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Intent(Settings.ACTION_APP_LOCALE_SETTINGS).apply {
+                data = Uri.fromParts("package", packageName, null)
+            }
+        } else {
+            Intent(Settings.ACTION_LOCALE_SETTINGS)
+        }
+    startActivity(intent)
 }

@@ -1,44 +1,36 @@
 package cn.tabidachi.electro.ui.server
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
-import cn.tabidachi.electro.ui.ElectroDestinations
-import cn.tabidachi.electro.ui.ElectroNavigationActions
+import cn.tabidachi.electro.ui.server.ServerContract.Action
+import cn.tabidachi.electro.ui.server.ServerContract.Event
+import kotlinx.serialization.Serializable
+import moe.tabidachi.compose.mvi.observe
 
-@Composable
-fun ServerRoute(
-    coordinator: ServerCoordinator = rememberServerCoordinator(),
-) {
-    // State observing and declarations
-    val state by coordinator.state.collectAsStateWithLifecycle(ServerState())
+@Serializable
+data object ServerRoute
 
-    // UI Actions
-    val actions = rememberServerActions(coordinator)
-
-    // UI Rendering
-    ServerScreen(state, actions)
+context(navController: NavHostController)
+fun NavGraphBuilder.server() = composable<ServerRoute> {
+    val viewModel: ServerViewModel = hiltViewModel()
+    val (state, event) = viewModel.observe { }
+    ServerScreen(
+        state = state.value,
+        action = remember {
+            Action(
+                showDialog = { event(Event.ShowDialog(it)) },
+                hideDialog = { event(Event.HideDialog) },
+                onSave = { event(Event.OnSave) },
+                onDialogValueChange = { event(Event.OnDialogValueChange(it)) },
+                onNavigateUp = navController::navigateUp
+            )
+        }
+    )
 }
 
-@Composable
-fun rememberServerActions(coordinator: ServerCoordinator): ServerActions {
-    return remember(coordinator) {
-        ServerActions(
-            onClick = coordinator::doStuff,
-            showDialog = coordinator::showDialog,
-            hideDialog = coordinator::hideDialog,
-            onSave = coordinator::onSave,
-            onDialogValueChange = coordinator::onDialogValueChange,
-            onNavigateUp = coordinator::onNavigateUp
-        )
-    }
-}
-
-fun NavGraphBuilder.serverRoute(navigationActions: ElectroNavigationActions) {
-    composable(ElectroDestinations.SERVER_ROUTE) {
-        ServerRoute(coordinator = rememberServerCoordinator(navigationActions = navigationActions))
-    }
+fun NavHostController.navigateToServer() {
+    navigate(ServerRoute)
 }

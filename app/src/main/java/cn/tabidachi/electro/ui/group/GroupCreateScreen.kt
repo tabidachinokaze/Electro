@@ -19,8 +19,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AddAPhoto
-import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Done
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,8 +33,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,18 +44,23 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.ViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.composable
 import cn.tabidachi.electro.R
 import cn.tabidachi.electro.data.database.entity.SessionType
 import cn.tabidachi.electro.data.network.Ktor
 import cn.tabidachi.electro.data.network.MinIO
 import cn.tabidachi.electro.ext.MINIO
 import cn.tabidachi.electro.model.request.SessionCreateRequest
-import cn.tabidachi.electro.ui.ElectroNavigationActions
 import cn.tabidachi.electro.ui.common.SimpleTextField
+import cn.tabidachi.electro.ui.group.GroupCreateContract.Effect
+import cn.tabidachi.electro.ui.group.GroupCreateContract.Event
+import cn.tabidachi.electro.ui.group.GroupCreateContract.State
+import cn.tabidachi.electro.ui.preview.PreviewSurface
+import cn.tabidachi.electro.ui.preview.Previews
 import com.mr0xf00.easycrop.CropResult
 import com.mr0xf00.easycrop.crop
 import com.mr0xf00.easycrop.rememberImageCropper
@@ -73,22 +76,48 @@ import io.ktor.util.generateNonce
 import io.minio.GetPresignedObjectUrlArgs
 import io.minio.http.Method
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import moe.tabidachi.compose.mvi.BaseViewModel
+import moe.tabidachi.compose.mvi.observe
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 
+@Serializable
+data object GroupCreateRoute
+
+context(navController: NavHostController)
+fun NavGraphBuilder.groupCreate() = composable<GroupCreateRoute> {
+    val viewModel: CreateGroupViewModel = hiltViewModel()
+    val (state, event) = viewModel.observe {
+        when (it) {
+            is Effect.NavigateUpAndNavigateToChannel -> {
+                navController.navigateToGroup(it.sid)
+            }
+        }
+    }
+    GroupCreateScreen(
+        state = state.value,
+        event = {
+            when (it) {
+                Event.NavigateUp -> navController.navigateUp()
+                else -> event(it)
+            }
+        }
+    )
+}
+
+fun NavHostController.navigateToGroupCreate() {
+    navigate(GroupCreateRoute)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateGroupScreen(
-    navigationActions: ElectroNavigationActions,
-    navHostController: NavHostController
+fun GroupCreateScreen(
+    state: State,
+    event: (Event) -> Unit
 ) {
-    val viewModel: CreateGroupViewModel = hiltViewModel()
-    val viewState by viewModel.viewState.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val cropper = rememberImageCropper()
@@ -99,11 +128,10 @@ fun CreateGroupScreen(
                 scope.launch {
                     when (val cropResult = cropper.crop(it, context)) {
                         is CropResult.Success -> {
-                            viewModel.onCropSuccess(cropResult.bitmap)
+                            event(Event.OnCropSuccess(cropResult.bitmap))
                         }
 
                         else -> {
-
                         }
                     }
                 }
@@ -121,24 +149,28 @@ fun CreateGroupScreen(
                 },
                 navigationIcon = {
                     IconButton(
-                        onClick = navigationActions::navigateUp
+                        onClick = {
+                            event(Event.NavigateUp)
+                        }
                     ) {
-                        Icon(imageVector = Icons.Rounded.ArrowBack, contentDescription = null)
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = null
+                        )
                     }
                 },
             )
-        }, floatingActionButton = {
+        },
+        floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    viewModel.onDone {
-                        navigationActions.navigateUp()
-                        navigationActions.navigateToGroup(it)
-                    }
-                }, modifier = Modifier
+                    event(Event.OnDone)
+                },
+                modifier = Modifier
                     .imePadding()
                     .navigationBarsPadding()
             ) {
-                if (viewState.processing) {
+                if (state.processing) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
                         strokeCap = StrokeCap.Round
@@ -147,7 +179,8 @@ fun CreateGroupScreen(
                     Icon(imageVector = Icons.Rounded.Done, contentDescription = null)
                 }
             }
-        }, contentWindowInsets = WindowInsets.statusBars
+        },
+        contentWindowInsets = WindowInsets.statusBars
     ) {
         Column(
             modifier = Modifier
@@ -173,34 +206,51 @@ fun CreateGroupScreen(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    viewState.image?.let {
+                    state.image?.let {
                         Image(
                             bitmap = it,
                             contentDescription = null,
                             contentScale = ContentScale.Crop
                         )
-                    } ?: kotlin.run {
+                    } ?: run {
                         Image(imageVector = Icons.Rounded.AddAPhoto, contentDescription = null)
                     }
                 }
                 SimpleTextField(
-                    value = viewState.title,
-                    onValueChange = viewModel::onTitleChange,
+                    value = state.title,
+                    onValueChange = {
+                        event(Event.OnTitleChange(it))
+                    },
                     modifier = Modifier.weight(1f),
                     maxLines = 4,
                     placeholder = {
                         Text(text = stringResource(id = R.string.group_name))
-                    }, isError = viewState.isTitleError
+                    },
+                    isError = state.isTitleError
                 )
             }
             OutlinedTextField(
-                value = viewState.description,
-                onValueChange = viewModel::onDescriptionChange,
+                value = state.description,
+                onValueChange = {
+                    event(Event.OnDescriptionChange(it))
+                },
                 label = {
                     Text(text = stringResource(id = R.string.group_description))
-                }, modifier = Modifier.fillMaxWidth()
+                },
+                modifier = Modifier.fillMaxWidth()
             )
         }
+    }
+}
+
+@Composable
+@Previews
+private fun GroupCreateScreenPreview() {
+    PreviewSurface {
+        GroupCreateScreen(
+            state = State(),
+            event = {}
+        )
     }
 }
 
@@ -208,57 +258,48 @@ fun CreateGroupScreen(
 class CreateGroupViewModel @Inject constructor(
     private val ktor: Ktor,
     private val minio: MinIO
-) : ViewModel() {
-    private val _viewState = MutableStateFlow(CreateGroupViewState())
-    val viewState = _viewState.asStateFlow()
+) : GroupCreateContract.ViewModel(State()) {
+    override fun event(event: Event) = when (event) {
+        is Event.OnDescriptionChange -> onDescriptionChange(event.value)
+        Event.OnDone -> onDone()
+        is Event.OnTitleChange -> onTitleChange(event.value)
+        Event.NavigateUp -> Unit
+        is Event.OnCropSuccess -> onCropSuccess(event.value)
+    }
 
-    fun onDone(onSuccess: (Long) -> Unit) {
-        if (_viewState.value.processing) return
+    private fun onDone() {
+        if (state.value.processing) return
         changeProcessing(true)
-        val title = _viewState.value.title
+        val title = state.value.title
         if (title.isBlank()) {
-            _viewState.update { it.copy(isTitleError = true) }
+            updateState { it.copy(isTitleError = true) }
             changeProcessing(false)
             return
         }
-        val image = _viewState.value.image
-        val description = _viewState.value.description
+        val image = state.value.image
+        val description = state.value.description
         viewModelScope.launch {
-            image?.let { image ->
-                val url = uploadImage(image.asAndroidBitmap()) ?: return@let Unit
-                SessionCreateRequest(
-                    type = SessionType.ROOM,
-                    title = title,
-                    description = description,
-                    image = url
-                ).let {
-                    ktor.createSession(it).onSuccess {
-                        it.data?.let {
-                            onSuccess(it)
-                        }
-                    }.onFailure {
-                        it.printStackTrace()
-                    }
+            val url = image?.asAndroidBitmap()?.let {
+                uploadImage(it) ?: return@launch changeProcessing(false)
+            }
+            val request = SessionCreateRequest(
+                type = SessionType.ROOM,
+                title = title,
+                description = description,
+                image = url
+            )
+            ktor.createSession(request).onSuccess {
+                it.data?.let {
+                    emitEffect(Effect.NavigateUpAndNavigateToChannel(it))
                 }
-            } ?: kotlin.run {
-                SessionCreateRequest(
-                    SessionType.ROOM,
-                    title,
-                    description,
-                    null
-                ).let {
-                    ktor.createSession(it).onSuccess {
-                        it.data?.let {
-                            onSuccess(it)
-                        }
-                    }
-                }
+            }.onFailure {
+                it.printStackTrace()
             }
             changeProcessing(false)
         }
     }
 
-    suspend fun uploadImage(bitmap: Bitmap): String? {
+    private suspend fun uploadImage(bitmap: Bitmap): String? {
         minio.checkOrCreateBucket(MinIO.AVATAR)
         val filename = generateNonce()
         val url = minio.client.getPresignedObjectUrl(
@@ -271,7 +312,7 @@ class CreateGroupViewModel @Inject constructor(
         return withContext(Dispatchers.IO) {
             ByteArrayOutputStream().use { outputStream ->
                 if (
-                    kotlin.runCatching {
+                    runCatching {
                         bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
                         ktor.upload.put(url) {
                             setBody(outputStream.toByteArray())
@@ -284,32 +325,51 @@ class CreateGroupViewModel @Inject constructor(
                             pathSegments = listOf(MinIO.AVATAR, filename)
                         )
                     ).toString()
-                } else null
+                } else {
+                    null
+                }
             }
         }
     }
 
-    fun onTitleChange(value: String) {
-        _viewState.update { it.copy(title = value, isTitleError = false) }
+    private fun onTitleChange(value: String) {
+        updateState { it.copy(title = value, isTitleError = false) }
     }
 
-    fun onDescriptionChange(value: String) {
-        _viewState.update { it.copy(description = value) }
+    private fun onDescriptionChange(value: String) {
+        updateState { it.copy(description = value) }
     }
 
-    fun onCropSuccess(bitmap: ImageBitmap) {
-        _viewState.update { it.copy(image = bitmap) }
+    private fun onCropSuccess(bitmap: ImageBitmap) {
+        updateState { it.copy(image = bitmap) }
     }
 
-    fun changeProcessing(value: Boolean) {
-        _viewState.update { it.copy(processing = value) }
+    private fun changeProcessing(value: Boolean) {
+        updateState { it.copy(processing = value) }
     }
 }
 
-data class CreateGroupViewState(
-    val title: String = "",
-    val description: String = "",
-    val image: ImageBitmap? = null,
-    val processing: Boolean = false,
-    val isTitleError: Boolean = false
-)
+interface GroupCreateContract {
+    abstract class ViewModel(initialState: State) :
+        BaseViewModel<State, Event, Effect>(initialState)
+
+    data class State(
+        val title: String = "",
+        val description: String = "",
+        val image: ImageBitmap? = null,
+        val processing: Boolean = false,
+        val isTitleError: Boolean = false
+    )
+
+    sealed interface Event {
+        data class OnDescriptionChange(val value: String) : Event
+        data class OnTitleChange(val value: String) : Event
+        data object OnDone : Event
+        data object NavigateUp : Event
+        data class OnCropSuccess(val value: ImageBitmap) : Event
+    }
+
+    sealed interface Effect {
+        data class NavigateUpAndNavigateToChannel(val sid: Long) : Effect
+    }
+}

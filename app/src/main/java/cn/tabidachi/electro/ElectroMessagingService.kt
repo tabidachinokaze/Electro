@@ -38,6 +38,7 @@ import kotlin.random.Random
 @AndroidEntryPoint
 class ElectroMessagingService : FirebaseMessagingService() {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
     @Inject lateinit var ktor: Ktor
     override fun onNewToken(token: String) {
         super.onNewToken(token)
@@ -55,10 +56,10 @@ class ElectroMessagingService : FirebaseMessagingService() {
             }
             val image = data["image"]?.let { ktor.convert(it).buildString() }
             val bitmap = runBlocking {
-                image?.let {
-                    val channel = ktor.upload.get(it).bodyAsChannel()
+                image?.runCatching {
+                    val channel = ktor.upload.get(this).bodyAsChannel()
                     BitmapFactory.decodeStream(channel.toInputStream())
-                }
+                }?.getOrNull()
             }
             val notification = ElectroNotification(this).call(bitmap, data)
             if (ActivityCompat.checkSelfPermission(
@@ -166,7 +167,10 @@ class ElectroNotification(
     private fun getActionText(@StringRes stringRes: Int, @ColorRes colorRes: Int): SpannableString {
         val spannable = SpannableString(context.getText(stringRes))
         spannable.setSpan(
-            ForegroundColorSpan(context.getColor(colorRes)), 0, spannable.length, 0
+            ForegroundColorSpan(context.getColor(colorRes)),
+            0,
+            spannable.length,
+            0
         )
         return spannable
     }

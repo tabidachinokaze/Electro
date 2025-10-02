@@ -51,7 +51,7 @@ class Factory(
         PeerConnectionFactory.initialize(options)
     }
 
-    val eglBaseContext = EglBase.create().eglBaseContext
+    val eglBaseContext: EglBase.Context = EglBase.create().eglBaseContext
     private val config = PeerConnection.RTCConfiguration(
         listOf(
             PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer()
@@ -247,7 +247,7 @@ suspend inline fun getDescription(
 ): Result<SessionDescription> = suspendCoroutine {
     val TAG = "getDescription"
     object : SdpObserver {
-        override fun onCreateSuccess(description: SessionDescription?) = kotlin.runCatching {
+        override fun onCreateSuccess(description: SessionDescription?) = runCatching {
             Log.d(
                 TAG, "onCreateSuccess: ${
                     description?.let { it1 ->

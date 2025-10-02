@@ -1,20 +1,24 @@
 package cn.tabidachi.electro.ui.group
 
+import android.content.Context
 import android.graphics.Bitmap
-import android.util.Log
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.toRoute
 import cn.tabidachi.electro.data.Repository
-import cn.tabidachi.electro.data.database.entity.Dialog
-import cn.tabidachi.electro.data.database.entity.Session
-import cn.tabidachi.electro.data.database.entity.User
 import cn.tabidachi.electro.data.network.Ktor
 import cn.tabidachi.electro.data.network.MinIO
 import cn.tabidachi.electro.ext.MINIO
-import cn.tabidachi.electro.model.Messenger
+import cn.tabidachi.electro.model.BaseMessenger
 import cn.tabidachi.electro.model.request.GroupUpdateRequest
-import cn.tabidachi.electro.model.response.GroupRole
 import cn.tabidachi.electro.model.response.GroupRoleType
+import cn.tabidachi.electro.ui.common.MessageManager
+import cn.tabidachi.electro.ui.common.MessageManagerImpl
+import cn.tabidachi.electro.ui.group.GroupContract.Effect
+import cn.tabidachi.electro.ui.group.GroupContract.Event
+import cn.tabidachi.electro.ui.group.GroupContract.State
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.HttpStatusCode
@@ -25,9 +29,6 @@ import io.ktor.util.generateNonce
 import io.minio.GetPresignedObjectUrlArgs
 import io.minio.http.Method
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -35,83 +36,116 @@ import javax.inject.Inject
 
 @HiltViewModel
 class GroupViewModel @Inject constructor(
-    override val repository: Repository,
-    override val ktor: Ktor,
-    private val minio: MinIO
-) : Messenger(repository, ktor) {
-    private val _viewState = MutableStateFlow(GroupViewState())
-    val viewState = _viewState.asStateFlow()
-    private val job1 = initMessage()
-    private val job2 = initWebSocket()
+    @ApplicationContext
+    private val context: Context,
+    private val repository: Repository,
+    private val ktor: Ktor,
+    private val minio: MinIO,
+    savedStateHandle: SavedStateHandle
+) : GroupContract.ViewModel(State()) {
+    private val route: GroupRoute = savedStateHandle.toRoute<GroupRoute>()
+    val messenger = BaseMessenger(
+        repository = repository,
+        ktor = ktor,
+        scope = viewModelScope,
+        sid = route.sid
+    )
+    val messageManager: MessageManager = MessageManagerImpl(
+        context = context,
+        repository = repository,
+        ktor = ktor,
+        scope = viewModelScope
+    )
 
-    fun setSessionId(sid: Long) {
-        this.sid.value = sid
-        _viewState.update { it.copy(sid = sid) }
-        getSessionInfo(sid)
-        getSessionUser(sid)
+    init {
+        viewModelScope.launch {
+            getSessionInfo(route.sid)
+            getSessionUser(route.sid)
+        }
+        event(Event.GetAdmin(route.sid))
     }
 
-    fun getSessionUser(sid: Long) {
+    override fun event(event: Event) = when (event) {
+        is Event.AddAdmin -> addAdmin(event.uid)
+        is Event.RemoveAdmin -> removeAdmin(event.uid)
+        is Event.RemoveMember -> removeMember(event.uid)
+        is Event.GetAdmin -> handleOneTimeEvent(event) { getAdmin(event.uid) }
+        is Event.NavigateToPair -> Unit
+        Event.NavigateUp -> Unit
+        Event.ExitGroup -> exitGroup(route.sid)
+        is Event.NavigateToChannelDetail -> Unit
+        Event.GetSessionInfo -> handleOneTimeEvent(event) { getSessionInfo(route.sid) }
+        Event.GetSessionUser -> handleOneTimeEvent(event) { getSessionUser(route.sid) }
+        is Event.NavigateToChannelAdmin -> Unit
+        is Event.NavigateToChannelEdit -> Unit
+        is Event.NavigateToChannelInvite -> Unit
+        Event.FindSession -> findSession()
+        Event.GetContact -> getContact()
+        is Event.Invite -> invite(event.uid)
+        is Event.OnCropSuccess -> onCropSuccess(event.value)
+        Event.OnDone -> onDone()
+        is Event.OnFilterChange -> onFilterChange(event.value)
+        is Event.OnDescriptionChange -> onDescriptionChange(event.value)
+        is Event.OnTitleChange -> onTitleChange(event.value)
+    }
+
+    private fun getSessionUser(sid: Long) {
         viewModelScope.launch {
             repository.getSessionUser(sid).collect {
                 it.mapNotNull {
                     repository.getUser(it).getOrNull()?.data
                 }.also { users ->
-                    _viewState.update { it.copy(users = users) }
+                    updateState { it.copy(users = users) }
                 }.forEach {
-                    listen(it.uid)
+                    messenger.listen(it.uid)
                 }
             }
         }
     }
 
-    fun getSessionInfo(sid: Long) {
+    private fun getSessionInfo(sid: Long) {
         viewModelScope.launch {
             repository.getDialog(sid).collect { dialog ->
-                _viewState.update { it.copy(dialog = dialog) }
+                updateState { it.copy(dialog = dialog) }
             }
         }
     }
 
-    override suspend fun getSessionId(): Long? {
-        return _viewState.value.sid
+    private fun onCropSuccess(bitmap: Bitmap) {
+        updateState { it.copy(image = bitmap) }
     }
 
-    fun onCropSuccess(bitmap: Bitmap) {
-        _viewState.update { it.copy(image = bitmap) }
+    private fun onTitleChange(value: String) {
+        updateState { it.copy(title = value, isTitleError = false) }
     }
 
-    fun onTitleChange(value: String) {
-        _viewState.update { it.copy(title = value, isTitleError = false) }
+    private fun onDescriptionChange(value: String) {
+        updateState { it.copy(description = value) }
     }
 
-    fun onDescriptionChange(value: String) {
-        _viewState.update { it.copy(description = value) }
-    }
-
-    fun onDone(callback: () -> Unit) {
+    private fun onDone() {
         viewModelScope.launch {
-            val viewState = _viewState.value
-            val sid = viewState.sid ?: return@launch
+            val viewState = state.value
+            val sid = route.sid
             val image = viewState.image?.let {
                 uploadImage(it) ?: return@launch
             }
             val title = viewState.title.ifBlank { null }
             if (title.isNullOrBlank()) {
-                _viewState.update { it.copy(isTitleError = true) }
+                updateState { it.copy(isTitleError = true) }
                 return@launch
             }
             val description = viewState.description.ifBlank { null }
             repository.updateGroupInfo(sid, GroupUpdateRequest(image, title, description))
                 .onSuccess {
                     it.data?.let {
-                        callback()
+                        emitEffect(Effect.NavigateUp)
                     }
                 }
         }
     }
 
-    suspend fun uploadImage(bitmap: Bitmap): String? {
+    private suspend fun uploadImage(bitmap: Bitmap): String? {
         minio.checkOrCreateBucket(MinIO.AVATAR)
         val filename = generateNonce()
         val url = minio.client.getPresignedObjectUrl(
@@ -124,7 +158,7 @@ class GroupViewModel @Inject constructor(
         return withContext(Dispatchers.IO) {
             ByteArrayOutputStream().use { outputStream ->
                 if (
-                    kotlin.runCatching {
+                    runCatching {
                         bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
                         ktor.upload.put(url) {
                             setBody(outputStream.toByteArray())
@@ -137,52 +171,51 @@ class GroupViewModel @Inject constructor(
                             pathSegments = listOf(MinIO.AVATAR, filename)
                         )
                     ).toString()
-                } else null
-            }
-        }
-    }
-
-    fun findSession() {
-        viewModelScope.launch {
-            _viewState.value.sid?.let {
-                repository.findSession(it).collect { session ->
-                    _viewState.update {
-                        it.copy(
-                            session = session,
-                            title = session.title ?: "",
-                            description = session.description ?: ""
-                        )
-                    }
+                } else {
+                    null
                 }
             }
         }
     }
 
-    fun exitGroup(sid: Long, onSuccess: () -> Unit) {
+    private fun findSession() {
+        viewModelScope.launch {
+            repository.findSession(route.sid).collect { session ->
+                updateState {
+                    it.copy(
+                        session = session,
+                        title = session.title ?: "",
+                        description = session.description ?: ""
+                    )
+                }
+            }
+        }
+    }
+
+    private fun exitGroup(sid: Long) {
         viewModelScope.launch {
             repository.exitSession(sid).onSuccess {
                 it.data?.let {
-                    _viewState.update { it.copy(isExit = true) }
-                    onSuccess()
+                    emitEffect(Effect.NavigateUp)
                 }
             }
         }
     }
 
-    fun getContact() {
+    private fun getContact() {
         viewModelScope.launch {
             repository.contact().onSuccess {
                 it.data?.mapNotNull {
                     repository.getUser(it).getOrNull()?.data
                 }?.let { contacts ->
-                    _viewState.update { it.copy(contacts = contacts) }
+                    updateState { it.copy(contacts = contacts) }
                 }
             }
         }
     }
 
-    fun invite(target: Long) {
-        val sid = _viewState.value.sid ?: return
+    private fun invite(target: Long) {
+        val sid = route.sid
         viewModelScope.launch {
             repository.invite(sid, target).onSuccess {
                 it.data?.let {
@@ -192,19 +225,19 @@ class GroupViewModel @Inject constructor(
         }
     }
 
-    fun onFilterChange(filter: String) {
-        _viewState.update { it.copy(filter = filter) }
+    private fun onFilterChange(filter: String) {
+        updateState { it.copy(filter = filter) }
     }
 
-    fun getAdmin(sid: Long) {
+    private fun getAdmin(sid: Long) {
         viewModelScope.launch {
             repository.getGroupAdmins(sid).onSuccess {
                 it.data?.also { roles ->
                     val isAdmin = roles.any { it.uid == ktor.uid }
                     val owner = roles.firstOrNull { it.type == GroupRoleType.OWNER }
-                    _viewState.update { it.copy(roles = roles, isAdmin = isAdmin) }
+                    updateState { it.copy(roles = roles, isAdmin = isAdmin) }
                     if (owner != null) {
-                        _viewState.update { it.copy(owner = owner.uid) }
+                        updateState { it.copy(owner = owner.uid) }
                     }
                 }
             }
@@ -212,82 +245,67 @@ class GroupViewModel @Inject constructor(
     }
 
     override fun onCleared() {
-        job1.cancel()
-        job2.cancel()
-        _viewState.value.users.forEach {
-            unlisten(it.uid)
+        state.value.users.forEach {
+            messenger.unlisten(it.uid)
         }
         super.onCleared()
     }
 
-    fun removeAdmin(target: Long) {
+    private fun removeAdmin(target: Long) {
         viewModelScope.launch {
-            repository.removeGroupAdmin(sid.value, target).onSuccess {
-                if (it.status == HttpStatusCode.OK.value) it.data?.let { target ->
-                    _viewState.update {
-                        it.copy(
-                            roles = it.roles.toMutableList().apply {
-                                removeIf {
-                                    it.uid == target
+            repository.removeGroupAdmin(route.sid, target).onSuccess {
+                if (it.status == HttpStatusCode.OK.value) {
+                    it.data?.let { target ->
+                        updateState {
+                            it.copy(
+                                roles = it.roles.toMutableList().apply {
+                                    removeIf {
+                                        it.uid == target
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }
         }
     }
 
-    fun addAdmin(target: Long) {
+    private fun addAdmin(target: Long) {
         viewModelScope.launch {
-            repository.addGroupAdmin(sid.value, target).onSuccess {
-                if (it.status == HttpStatusCode.OK.value) it.data?.let { role ->
-                    _viewState.update {
-                        it.copy(
-                            roles = it.roles.toMutableList().apply {
-                                add(role)
-                            }
-                        )
+            repository.addGroupAdmin(route.sid, target).onSuccess {
+                if (it.status == HttpStatusCode.OK.value) {
+                    it.data?.let { role ->
+                        updateState {
+                            it.copy(
+                                roles = it.roles.toMutableList().apply {
+                                    add(role)
+                                }
+                            )
+                        }
                     }
                 }
             }
         }
     }
 
-    fun removeMember(target: Long) {
+    private fun removeMember(target: Long) {
         viewModelScope.launch {
-            repository.removeGroupMember(sid.value, target).onSuccess {
-                if (it.status == HttpStatusCode.OK.value) it.data?.let { target ->
-                    _viewState.update {
-                        it.copy(
-                            users = it.users.toMutableList().apply {
-                                removeIf {
-                                    it.uid == target
+            repository.removeGroupMember(route.sid, target).onSuccess {
+                if (it.status == HttpStatusCode.OK.value) {
+                    it.data?.let { target ->
+                        updateState {
+                            it.copy(
+                                users = it.users.toMutableList().apply {
+                                    removeIf {
+                                        it.uid == target
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
-
-data class GroupViewState(
-    val sid: Long? = null,
-    val dialog: Dialog? = null,
-    val reply: Long? = null,
-    val users: List<User> = emptyList(),
-    val image: Bitmap? = null,
-    val title: String = "",
-    val isTitleError: Boolean = false,
-    val description: String = "",
-    val processing: Boolean = false,
-    val session: Session? = null,
-    val isExit: Boolean = false,
-    val filter: String = "",
-    val contacts: List<User> = emptyList(),
-    val roles: List<GroupRole> = emptyList(),
-    val isAdmin: Boolean = false,
-    val owner: Long = 0
-)

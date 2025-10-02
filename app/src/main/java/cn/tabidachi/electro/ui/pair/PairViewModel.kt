@@ -1,49 +1,85 @@
 package cn.tabidachi.electro.ui.pair
 
-import android.app.Application
+import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.PersonAdd
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.toRoute
 import cn.tabidachi.electro.CallActivity
 import cn.tabidachi.electro.OFFER_ACTION
 import cn.tabidachi.electro.R
 import cn.tabidachi.electro.data.Repository
-import cn.tabidachi.electro.data.database.entity.Message
 import cn.tabidachi.electro.data.database.entity.RelationState
-import cn.tabidachi.electro.data.database.entity.User
 import cn.tabidachi.electro.data.network.Ktor
+import cn.tabidachi.electro.ktx.TAG
+import cn.tabidachi.electro.model.BaseMessenger
 import cn.tabidachi.electro.model.Messenger
-import cn.tabidachi.electro.model.attachment.Attachment
+import cn.tabidachi.electro.ui.common.MessageManager
+import cn.tabidachi.electro.ui.common.MessageManagerImpl
+import cn.tabidachi.electro.ui.pair.PairContract.Event
+import cn.tabidachi.electro.ui.pair.PairContract.State
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class PairViewModel @Inject constructor(
-    private val application: Application,
-    override val ktor: Ktor,
-    override val repository: Repository
-) : Messenger(repository, ktor) {
-    private val _viewState = MutableStateFlow(PairViewState())
-    val viewState = _viewState.asStateFlow()
-    private val job1 = initWebSocket()
-    private val job2 = initMessage()
+    @ApplicationContext
+    private val context: Context,
+    private val ktor: Ktor,
+    private val repository: Repository,
+    savedStateHandle: SavedStateHandle
+) : PairContract.ViewModel(
+    initialState = State(
+        uid = ktor.uid,
+        target = savedStateHandle.toRoute<PairRoute>().target
+    )
+) {
+    val messenger: Messenger = object : BaseMessenger(
+        repository = repository,
+        ktor = ktor,
+        scope = viewModelScope,
+        sid = null
+    ) {
+        override suspend fun getSessionId(): Long? {
+            Log.d(TAG, "getSessionId: target = ${state.value.target}")
+            Log.d(TAG, "super.getSessionId() = ${super.getSessionId()}")
+            return super.getSessionId() ?: repository.createSessionByPairUser(state.value.target)
+                .getOrNull()?.data.also { sid ->
+                    updateState { it.copy(sid = sid) }
+                    sid?.let(::setSessionId)
+                }
+        }
+    }
 
+    val messageManager: MessageManager = MessageManagerImpl(
+        context = context,
+        repository = repository,
+        ktor = ktor,
+        scope = viewModelScope
+    )
 
-    fun setTarget(target: Long) {
-        if (target == ktor.uid) return
-        _viewState.update { it.copy(target = target) }
+    init {
+        event(Event.Initialize)
+    }
+
+    override fun event(event: Event) = when (event) {
+        Event.Initialize -> handleOneTimeEvent(event) { initialize(state.value.target) }
+        Event.Call -> call()
+        Event.NavigateUp -> Unit
+        is Event.OnMenuClick -> onMenuClick(event.value)
+    }
+
+    private fun initialize(target: Long) {
         findSessionId(target)
         getUser(target)
         getRelationState(target)
@@ -52,7 +88,7 @@ class PairViewModel @Inject constructor(
     private fun getRelationState(target: Long) {
         viewModelScope.launch {
             repository.getRelationState(target).onSuccess {
-                val filter = _viewState.value.menu.filter {
+                val filter = state.value.menu.filter {
                     it !in listOf(
                         PairMenuItem.CONTACT_ADD,
                         PairMenuItem.CONTACT_DELETE,
@@ -81,10 +117,12 @@ class PairViewModel @Inject constructor(
                         )
                     }
                 }.let { menu ->
-                    _viewState.update {
-                        it.copy(menu = menu.apply {
-                            addAll(filter)
-                        })
+                    updateState {
+                        it.copy(
+                            menu = menu.apply {
+                                addAll(filter)
+                            }
+                        )
                     }
                 }
             }
@@ -94,40 +132,29 @@ class PairViewModel @Inject constructor(
     private fun findSessionId(target: Long) {
         viewModelScope.launch {
             repository.findSessionByPairUser(target).collect { sid ->
-                _viewState.update { it.copy(sid = sid) }
-                this@PairViewModel.sid.value = sid
+                updateState { it.copy(sid = sid) }
+                messenger.setSessionId(sid)
             }
         }
     }
 
-    fun getUser(target: Long) {
+    private fun getUser(target: Long) {
         viewModelScope.launch {
             repository.getUser(target).onSuccess { (_, _, user) ->
                 user?.let {
                     println(it)
-                    _viewState.update { it.copy(targetUser = user) }
+                    updateState { it.copy(targetUser = user) }
                 }
             }
         }
         viewModelScope.launch {
-            listen(target)
+            messenger.listen(target)
         }
     }
 
-    override suspend fun getSessionId(): Long? {
-        val target = _viewState.value.target ?: return null
-        return _viewState.value.sid ?: repository.createSessionByPairUser(target)
-            .getOrNull()?.data.also { sid ->
-                _viewState.update { it.copy(sid = sid) }
-                sid?.let {
-                    this.sid.value = it
-                }
-            }
-    }
-
-    fun onMenuClick(menu: PairMenuItem) {
+    private fun onMenuClick(menu: PairMenuItem) {
         viewModelScope.launch {
-            val target = _viewState.value.target ?: return@launch
+            val target = state.value.target
             when (menu) {
                 PairMenuItem.CONTACT_ADD -> {
                     repository.addContact(target)
@@ -151,40 +178,24 @@ class PairViewModel @Inject constructor(
     }
 
     override fun onCleared() {
-        readMessage()
-        viewModelScope.cancel()
+        messenger.readMessage()
         viewModelScope.launch {
-            _viewState.value.target?.let { unlisten(it) }
+            messenger.unlisten(state.value.target)
+            viewModelScope.cancel()
         }
-        job1.cancel()
-        job2.cancel()
         super.onCleared()
     }
 
-    fun call() {
-        val intent = Intent(application, CallActivity::class.java).apply {
+    private fun call() {
+        val intent = Intent(context, CallActivity::class.java).apply {
             action = OFFER_ACTION
             putExtra("src", "${ktor.uid}")
-            putExtra("dst", "${_viewState.value.target}")
+            putExtra("dst", "${state.value.target}")
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
-        application.startActivity(intent)
+        context.startActivity(intent)
     }
 }
-
-data class PairViewState(
-    val sid: Long? = null,
-    val target: Long? = null,
-    val messages: List<Triple<Boolean, Message, Attachment?>> = emptyList(),
-    val attachments: SnapshotStateList<Attachment> = mutableStateListOf(),
-    val text: String = "",
-    val isProcessing: Boolean = false,
-    val targetUser: User? = null,
-    val isRefresh: Boolean = false,
-    val menu: List<PairMenuItem> = emptyList(),
-    val scrollTo: Int = 0,
-    val newMessage: Long? = null,
-)
 
 enum class PairMenuItem(
     @StringRes val text: Int,

@@ -1,11 +1,9 @@
 package cn.tabidachi.electro.ui.auth
 
-import android.app.Application
+import android.content.Context
 import android.util.Log
-import androidx.annotation.StringRes
-import androidx.compose.material3.SnackbarHostState
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.datastore.preferences.core.edit
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cn.tabidachi.electro.PreferenceConstant
 import cn.tabidachi.electro.R
@@ -15,143 +13,152 @@ import cn.tabidachi.electro.data.network.Ktor
 import cn.tabidachi.electro.ext.dataStore
 import cn.tabidachi.electro.ext.isEmail
 import cn.tabidachi.electro.ext.isValidPassword
+import cn.tabidachi.electro.ktx.TAG
 import cn.tabidachi.electro.model.request.CaptchaRequest
 import cn.tabidachi.electro.model.request.LoginRequest
 import cn.tabidachi.electro.model.request.RegisterRequest
+import cn.tabidachi.electro.ui.auth.AuthContract.Effect
+import cn.tabidachi.electro.ui.auth.AuthContract.Event
+import cn.tabidachi.electro.ui.auth.AuthContract.State
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import moe.tabidachi.compose.mvi.BaseViewModel
 import javax.inject.Inject
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val application: Application,
+    @ApplicationContext
+    private val context: Context,
     private val ktor: Ktor,
-    private val database: ElectroDatabase
-) : ViewModel() {
-    private val _viewState = MutableStateFlow(AuthViewState())
-    val viewState = _viewState.asStateFlow()
-    val hostState: SnackbarHostState = SnackbarHostState()
-    val currentState
-        get() = _viewState.value
+    private val database: ElectroDatabase,
+) : BaseViewModel<State, Event, Effect>(State()), AuthContract.ViewModel {
+    override fun event(event: Event) = when (event) {
+        Event.Auth -> auth()
+        Event.ChangeAuthMethod -> changeAuthMethod()
+        is Event.ChangeProcessing -> changeProcessing(event.value)
+        is Event.ErrorStateChange -> errorStateChange(event.value)
+        is Event.LanguageMenuExpandedChange -> languageMenuExpandedChange(event.value)
+        Event.OnCodeRequest -> onCodeRequest()
+        is Event.OnPasswordVisibleChange -> onPasswordVisibleChange(event.value)
+        is Event.OnRequestChange -> onRequestChange(event.value)
+        Event.NavigateToServer -> Unit
+        Event.NavigateToLocaleSettings -> Unit
+    }
 
-    fun onCodeRequest() {
-        val email = _viewState.value.request.first
+    private fun onCodeRequest() {
+        val email = state.value.request.first
         when {
-            !email.isEmail() -> {
-                _viewState.update { it.copy(errorState = it.errorState.copy(email = true)) }
+            !email.text.isEmail() -> {
+                updateState { it.copy(errorState = it.errorState.copy(email = true)) }
                 return
             }
         }
         viewModelScope.launch {
-            ktor.checkUserExist(email).onSuccess {
+            ktor.checkUserExist(email.text).onSuccess {
                 if (it.status == HttpStatusCode.OK.value) {
                     if (it.data != null) {
-                        hostState.showSnackbar(application.resources.getString(R.string.user_registered), withDismissAction = true)
+                        emitEffect(Effect.Toast(context.resources.getString(R.string.user_registered)))
                         return@launch
                     }
                 }
                 val captchaRequest = CaptchaRequest(
-                    email,
+                    email.text,
                     CaptchaRequest.Method.EMAIL,
                     CaptchaRequest.Type.REGISTER
                 )
                 ktor.captcha(captchaRequest).onSuccess {
-                    _viewState.update { it.copy(buttonEnabled = false) }
+                    updateState { it.copy(buttonEnabled = false) }
                     launch {
                         val countDown = 60
                         repeat(countDown) { index ->
-                            _viewState.update { it.copy(buttonText = "${countDown - index}s") }
+                            updateState { it.copy(buttonText = "${countDown - index}s") }
                             delay(1000)
                         }
-                        _viewState.update { it.copy(buttonEnabled = true, buttonText = null) }
+                        updateState { it.copy(buttonEnabled = true, buttonText = null) }
                     }
-                    hostState.showSnackbar(it.message, withDismissAction = true)
-                    _viewState.update { it.copy(isProcessing = false) }
+                    emitEffect(Effect.Toast(it.message))
+                    updateState { it.copy(isProcessing = false) }
                 }.onFailure { t ->
-                    hostState.showSnackbar(t.message.toString(), withDismissAction = true)
-                    _viewState.update { it.copy(isProcessing = false) }
+                    emitEffect(Effect.Toast(t.message.toString()))
+                    updateState { it.copy(isProcessing = false) }
                     t.printStackTrace()
                 }
             }.onFailure {
-                hostState.showSnackbar(it.message.toString(), withDismissAction = true)
+                emitEffect(Effect.Toast(it.message.toString()))
                 return@launch
             }
-
         }
     }
 
-    fun onPasswordVisibleChange(value: Boolean) {
-        _viewState.update { it.copy(passwordVisible = value) }
+    private fun onPasswordVisibleChange(value: Boolean) {
+        updateState { it.copy(passwordVisible = value) }
     }
 
-    fun errorStateChange(state: ErrorState) {
-        _viewState.update { it.copy(errorState = state) }
+    private fun errorStateChange(state: ErrorState) {
+        updateState { it.copy(errorState = state) }
     }
 
-    fun onRequestChange(triple: Triple<String, String, String>) {
-        _viewState.update { it.copy(request = triple) }
+    private fun onRequestChange(triple: Triple<TextFieldValue, TextFieldValue, TextFieldValue>) {
+        updateState { it.copy(request = triple) }
     }
 
-    fun changeAuthMethod() {
-        _viewState.update { it.copy(method = it.method.toggle()) }
+    private fun changeAuthMethod() {
+        updateState { it.copy(method = it.method.toggle()) }
     }
 
-    fun auth() {
-        if (currentState.isProcessing) return
+    private fun auth() {
+        if (state.value.isProcessing) return
         viewModelScope.launch {
-            with(_viewState.value.request) {
+            with(state.value.request) {
                 when {
-                    !first.isEmail() -> {
-                        _viewState.update { it.copy(errorState = it.errorState.copy(email = true)) }
+                    !first.text.isEmail() -> {
+                        updateState { it.copy(errorState = it.errorState.copy(email = true)) }
                         return@launch
                     }
 
-                    !second.isValidPassword() -> {
-                        _viewState.update { it.copy(errorState = it.errorState.copy(password = true)) }
+                    !second.text.isValidPassword() -> {
+                        updateState { it.copy(errorState = it.errorState.copy(password = true)) }
                         return@launch
                     }
 
-                    _viewState.value.method == AuthMethod.REGISTER -> {
+                    state.value.method == AuthMethod.REGISTER -> {
                         changeProcessing(true)
-                        ktor.checkUserExist(_viewState.value.request.first).also {
+                        ktor.checkUserExist(state.value.request.first.text).also {
                             changeProcessing(false)
                         }.onSuccess {
                             if (it.status == HttpStatusCode.OK.value) {
                                 if (it.data != null) {
-                                    hostState.showSnackbar(application.resources.getString(R.string.user_registered), withDismissAction = true)
+                                    emitEffect(Effect.Toast(context.resources.getString(R.string.user_registered)))
                                     return@launch
                                 }
                             }
                         }.onFailure {
-                            hostState.showSnackbar(it.message.toString(), withDismissAction = true)
+                            emitEffect(Effect.Toast(it.message.toString()))
                             return@launch
                         }
-                        if (third.isBlank()) {
-                            _viewState.update { it.copy(errorState = it.errorState.copy(code = true)) }
+                        if (third.text.isBlank()) {
+                            updateState { it.copy(errorState = it.errorState.copy(code = true)) }
                             return@launch
                         } else {
-
                         }
                     }
 
-                    _viewState.value.method == AuthMethod.LOGIN -> {
+                    state.value.method == AuthMethod.LOGIN -> {
                         changeProcessing(true)
-                        ktor.checkUserExist(_viewState.value.request.first).also {
+                        ktor.checkUserExist(state.value.request.first.text).also {
                             changeProcessing(false)
                         }.onSuccess {
                             if (it.status == HttpStatusCode.NotFound.value) {
-                                hostState.showSnackbar(application.resources.getString(R.string.user_unregistered), withDismissAction = true)
+                                emitEffect(Effect.Toast(context.resources.getString(R.string.user_unregistered)))
                                 return@launch
                             }
                         }.onFailure {
-                            hostState.showSnackbar(it.message.toString(), withDismissAction = true)
+                            emitEffect(Effect.Toast(it.message.toString()))
                             return@launch
                         }
                     }
@@ -160,10 +167,10 @@ class AuthViewModel @Inject constructor(
                 }
             }
             changeProcessing(true)
-            when (_viewState.value.method) {
+            when (state.value.method) {
                 AuthMethod.LOGIN -> {
-                    _viewState.value.request.let {
-                        LoginRequest(it.first, it.second)
+                    state.value.request.let {
+                        LoginRequest(it.first.text, it.second.text)
                     }.let {
                         ktor.login(it).onSuccess {
                             Log.d(TAG, "auth: $it")
@@ -174,8 +181,8 @@ class AuthViewModel @Inject constructor(
                 }
 
                 AuthMethod.REGISTER -> {
-                    _viewState.value.request.let {
-                        RegisterRequest(it.first, it.second, it.third)
+                    state.value.request.let {
+                        RegisterRequest(it.first.text, it.second.text, it.third.text)
                     }.let {
                         ktor.register(it).onSuccess {
                             Log.d(TAG, "auth: $it")
@@ -187,69 +194,35 @@ class AuthViewModel @Inject constructor(
             }.also {
                 changeProcessing(false)
             }.onSuccess { (status, message, data) ->
-                hostState.showSnackbar(message, withDismissAction = true)
+                emitEffect(Effect.Toast(message))
                 when (data) {
                     null -> {
-                        _viewState.update { it.copy(isAuthSuccess = false) }
+                        updateState { it.copy(isAuthSuccess = false) }
                     }
 
                     else -> {
-                        application.dataStore.edit {
+                        context.dataStore.edit {
                             it[PreferenceConstant.Key.TOKEN] = data.token
                             it[PreferenceConstant.Key.UID] = data.uid
                         }
                         withContext(Dispatchers.IO) {
                             database.accountDao().upsert(Account(data.uid, data.token))
                         }
-                        _viewState.update { it.copy(isAuthSuccess = true) }
+                        updateState { it.copy(isAuthSuccess = true) }
                     }
                 }
             }.onFailure {
-                hostState.showSnackbar(it.message.toString(), withDismissAction = true)
+                emitEffect(Effect.Toast(it.message.toString()))
                 it.printStackTrace()
             }
         }
     }
 
-    fun changeProcessing(isProcessing: Boolean) {
-        _viewState.update { it.copy(isProcessing = isProcessing) }
+    private fun changeProcessing(isProcessing: Boolean) {
+        updateState { it.copy(isProcessing = isProcessing) }
     }
 
-    private fun update(block: (AuthViewState) -> AuthViewState) {
-        _viewState.update(block)
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-    }
-
-    fun languageMenuExpandedChange(value: Boolean) {
-        _viewState.update { it.copy(isLanguageMenuExpanded = value) }
-    }
-
-    companion object {
-        val TAG = AuthViewModel::class.simpleName
-    }
-}
-
-data class AuthViewState(
-    val token: String? = null,
-    val isProcessing: Boolean = false,
-    val method: AuthMethod = AuthMethod.LOGIN,
-    val request: Triple<String, String, String> = Triple("", "", ""),
-    val errorState: ErrorState = ErrorState(),
-    val passwordVisible: Boolean = false,
-    val buttonText: String? = null,
-    val buttonEnabled: Boolean = true,
-    val isAuthSuccess: Boolean = false,
-    val isLanguageMenuExpanded: Boolean = false
-)
-
-enum class AuthMethod(@StringRes val id: Int) {
-    LOGIN(R.string.login), REGISTER(R.string.register);
-
-    fun toggle() = when (this) {
-        LOGIN -> REGISTER
-        REGISTER -> LOGIN
+    private fun languageMenuExpandedChange(value: Boolean) {
+        updateState { it.copy(isLanguageMenuExpanded = value) }
     }
 }

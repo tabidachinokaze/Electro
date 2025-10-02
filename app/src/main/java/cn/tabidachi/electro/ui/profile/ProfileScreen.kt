@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Done
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -18,48 +18,50 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavHostController
 import cn.tabidachi.electro.R
+import cn.tabidachi.electro.ui.preview.PreviewSurface
+import cn.tabidachi.electro.ui.preview.Previews
+import cn.tabidachi.electro.ui.profile.ProfileContract.Event
+import cn.tabidachi.electro.ui.profile.ProfileContract.State
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
-    navHostController: NavHostController
+    state: State,
+    event: (Event) -> Unit
 ) {
-    val viewModel: ProfileViewModel = hiltViewModel()
-    val viewState by viewModel.viewState.collectAsState()
-    val username = viewState.username
-    val email = viewState.email
-    val password = viewState.password
-    LaunchedEffect(key1 = Unit, block = {
-        viewModel.getUser()
-    })
+    val username = state.username
+    val email = state.email
+    val password = state.password
+    LaunchedEffect(Unit) {
+        event(Event.GetUser)
+    }
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(text = stringResource(id = R.string.profile))
-                }, navigationIcon = {
-                    IconButton(onClick = {
-                        navHostController.navigateUp()
-                    }) {
-                        Icon(imageVector = Icons.Rounded.ArrowBack, contentDescription = null)
+                },
+                navigationIcon = {
+                    IconButton(
+                        onClick = { event(Event.NavigateUp) }
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = null
+                        )
                     }
-                }, actions = {
-                    IconButton(onClick = {
-                        viewModel.done {
-                            navHostController.navigateUp()
-                        }
-                    }) {
+                },
+                actions = {
+                    IconButton(
+                        onClick = { event(Event.Done) }
+                    ) {
                         Icon(imageVector = Icons.Rounded.Done, contentDescription = null)
                     }
                 }
@@ -71,26 +73,36 @@ fun ProfileScreen(
         ) {
             item {
                 TextField(
-                    value = username, onValueChange = viewModel::onUsernameChange,
+                    value = username,
+                    onValueChange = {
+                        event(Event.OnUsernameChange(it))
+                    },
                     label = {
                         Text(text = stringResource(id = R.string.username))
-                    }, modifier = Modifier.fillMaxWidth(),
+                    },
+                    modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
                 )
             }
             item {
                 TextField(
-                    value = email, onValueChange = viewModel::onEmailChange,
+                    value = email,
+                    onValueChange = {
+                        event(Event.OnEmailChange(it))
+                    },
                     label = {
                         Text(text = stringResource(id = R.string.email))
-                    }, modifier = Modifier.fillMaxWidth(),
+                    },
+                    modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
                 )
             }
             item {
                 TextField(
                     value = password,
-                    onValueChange = viewModel::onPasswordChange,
+                    onValueChange = {
+                        event(Event.OnPasswordChange(it))
+                    },
                     label = {
                         Text(text = stringResource(id = R.string.password))
                     },
@@ -99,10 +111,12 @@ fun ProfileScreen(
                         keyboardType = KeyboardType.Password,
                         imeAction = ImeAction.Done
                     ),
-                    visualTransformation = if (viewState.passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    visualTransformation = if (state.passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
-                        IconButton(onClick = viewModel::onVisibleChange) {
-                            if (viewState.passwordVisible) {
+                        IconButton(
+                            onClick = { event(Event.OnVisibleChange) }
+                        ) {
+                            if (state.passwordVisible) {
                                 Icon(
                                     imageVector = Icons.Rounded.VisibilityOff,
                                     contentDescription = null
@@ -118,5 +132,16 @@ fun ProfileScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+@Previews
+private fun ProfileScreenPreview() {
+    PreviewSurface {
+        ProfileScreen(
+            state = State(),
+            event = {}
+        )
     }
 }

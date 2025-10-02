@@ -1,5 +1,6 @@
 package cn.tabidachi.electro.ui.common
 
+import android.content.ClipData
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.LocalIndication
@@ -42,43 +43,50 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.toClipEntry
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import cn.tabidachi.electro.model.DownloadMessageItem
 import cn.tabidachi.electro.model.Messenger
-import cn.tabidachi.electro.ui.ElectroNavigationActions
 import cn.tabidachi.electro.ui.component.PopupMenu
 import cn.tabidachi.electro.ui.component.popupMenuAnchor
 import cn.tabidachi.electro.ui.component.rememberPopupState
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 
+data class MessageAction(
+    val navigateToPair: (uid: Long) -> Unit = {}
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MessageColumn(
     modifier: Modifier = Modifier,
-    viewModel: Messenger,
-    messageViewModel: MessageViewModel,
-    navigationActions: ElectroNavigationActions,
+    messenger: Messenger,
+    messageManager: MessageManager,
     isMultiSession: Boolean = false,
     canSendMessage: Boolean = true,
+    action: MessageAction
 ) {
     val listState = rememberLazyListState()
-    val messages = viewModel.messages
-    val messageSendingQueue = viewModel.uploadMessages
+    val messages = messenger.messages
+    val messageSendingQueue = messenger.uploadMessages
     val scope = rememberCoroutineScope()
     val firstVisibleItem by remember { derivedStateOf { listState.firstVisibleItemIndex } }
-    val clipboardManager = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
     var popupItem by remember {
         mutableStateOf<DownloadMessageItem?>(null)
     }
     val popupState = rememberPopupState()
     val refreshState = rememberPullToRefreshState()
     val scaleFraction = {
-        if (viewModel.isRefresh) 1f
-        else LinearOutSlowInEasing.transform(refreshState.distanceFraction).coerceIn(0f, 1f)
+        if (messenger.isRefresh) {
+            1f
+        } else {
+            LinearOutSlowInEasing.transform(refreshState.distanceFraction).coerceIn(0f, 1f)
+        }
     }
     Column(modifier = modifier) {
         Box(
@@ -93,8 +101,8 @@ fun MessageColumn(
                     .matchParentSize()
                     .pullToRefresh(
                         state = refreshState,
-                        isRefreshing = viewModel.isRefresh,
-                        onRefresh = viewModel::onRefresh
+                        isRefreshing = messenger.isRefresh,
+                        onRefresh = messenger::onRefresh
                     )
             ) {
                 items(messageSendingQueue) { item ->
@@ -145,7 +153,7 @@ fun MessageColumn(
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.clickable {
                                         item.user?.let {
-                                            navigationActions.navigateToPair(it.uid)
+                                            action.navigateToPair(it.uid)
                                         }
                                     }
                                 )
@@ -163,25 +171,27 @@ fun MessageColumn(
                             )
                         ) {
                             val replyItem =
-                                viewModel.messages.firstOrNull { it.message.mid == item.message.reply }
+                                messenger.messages.firstOrNull { it.message.mid == item.message.reply }
                             AttachmentMessage(
                                 item = item,
                                 replyContent = {
-                                    if (replyItem != null) ReplyContent(
-                                        item = replyItem,
-                                        scope = scope,
-                                        color = when (item.type) {
-                                            BubbleType.Incoming -> MaterialTheme.colorScheme.secondary
-                                            BubbleType.Outgoing -> MaterialTheme.colorScheme.primary
-                                        },
-                                        onScrollTo = {
-                                            listState.animateScrollToItem(
-                                                viewModel.messages.indexOf(
-                                                    replyItem
+                                    if (replyItem != null) {
+                                        ReplyContent(
+                                            item = replyItem,
+                                            scope = scope,
+                                            color = when (item.type) {
+                                                BubbleType.Incoming -> MaterialTheme.colorScheme.secondary
+                                                BubbleType.Outgoing -> MaterialTheme.colorScheme.primary
+                                            },
+                                            onScrollTo = {
+                                                listState.animateScrollToItem(
+                                                    messenger.messages.indexOf(
+                                                        replyItem
+                                                    )
                                                 )
-                                            )
-                                        }
-                                    )
+                                            }
+                                        )
+                                    }
                                 }
                             )
                         }
@@ -198,7 +208,7 @@ fun MessageColumn(
             ) {
                 PullToRefreshDefaults.Indicator(
                     state = refreshState,
-                    isRefreshing = viewModel.isRefresh
+                    isRefreshing = messenger.isRefresh
                 )
             }
             androidx.compose.animation.AnimatedVisibility(
@@ -210,7 +220,8 @@ fun MessageColumn(
                         scope.launch {
                             listState.animateScrollToItem(0)
                         }
-                    }, shape = CircleShape,
+                    },
+                    shape = CircleShape,
                     containerColor = MaterialTheme.colorScheme.inversePrimary
                 ) {
                     Icon(
@@ -220,29 +231,33 @@ fun MessageColumn(
                 }
             }
         }
-        if (canSendMessage) BottomMessageField(
-            sessionIdRequest = viewModel::getSessionId,
-            replyRequest = viewModel::getReplyId,
-            onSuccess = viewModel::onMessageSendSuccess,
-            replyContent = {
-                val item = viewModel.messages.firstOrNull { it.message.mid == viewModel.reply }
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = viewModel.reply != null
-                ) {
-                    item ?: return@AnimatedVisibility
-                    ReplyContent(
-                        item = item,
-                        scope = scope,
-                        onReplyClear = viewModel::onReplyClear,
-                        onScrollTo = {
-                            listState.animateScrollToItem(viewModel.messages.indexOf(item))
-                        }
-                    )
-                }
-            },
-            modifier = Modifier.imePadding(),
-            viewModel = messageViewModel,
-        ) else Spacer(modifier = Modifier.navigationBarsPadding())
+        if (canSendMessage) {
+            BottomMessageField(
+                sessionIdRequest = messenger::getSessionId,
+                replyRequest = messenger::getReplyId,
+                onSuccess = messenger::onMessageSendSuccess,
+                replyContent = {
+                    val item = messenger.messages.firstOrNull { it.message.mid == messenger.reply }
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = messenger.reply != null
+                    ) {
+                        item ?: return@AnimatedVisibility
+                        ReplyContent(
+                            item = item,
+                            scope = scope,
+                            onReplyClear = messenger::onReplyClear,
+                            onScrollTo = {
+                                listState.animateScrollToItem(messenger.messages.indexOf(item))
+                            }
+                        )
+                    }
+                },
+                modifier = Modifier.imePadding(),
+                messageManager = messageManager,
+            )
+        } else {
+            Spacer(modifier = Modifier.navigationBarsPadding())
+        }
     }
     PopupMenu(
         state = popupState,
@@ -255,23 +270,32 @@ fun MessageColumn(
                 DropdownMenuItem(
                     text = {
                         Text(text = stringResource(id = it.text))
-                    }, leadingIcon = {
+                    },
+                    leadingIcon = {
                         Icon(
                             imageVector = it.icon,
                             contentDescription = null
                         )
-                    }, onClick = {
+                    },
+                    onClick = {
                         popupState.hide()
                         when (it) {
                             MessageMenu.Reply -> {
-                                viewModel.onReply(popupItem.message.mid)
+                                messenger.onReply(popupItem.message.mid)
                             }
 
                             MessageMenu.Copy -> {
                                 when {
                                     !popupItem.message.text.isNullOrBlank() -> {
                                         AnnotatedString(popupItem.message.text).let {
-                                            clipboardManager.setText(it)
+                                            scope.launch {
+                                                clipboard.setClipEntry(
+                                                    ClipData.newPlainText(
+                                                        it.text,
+                                                        it.text
+                                                    ).toClipEntry()
+                                                )
+                                            }
                                         }
                                     }
 
@@ -282,7 +306,7 @@ fun MessageColumn(
                             MessageMenu.Forward -> {}
                             MessageMenu.Edit -> {}
                             MessageMenu.Delete -> {
-                                viewModel.deleteMessage(popupItem.message.mid)
+                                messenger.deleteMessage(popupItem.message.mid)
                             }
                         }
                     }
@@ -291,7 +315,6 @@ fun MessageColumn(
         }
     }
 }
-
 
 @Composable
 fun MessageDropdownMenu(
@@ -307,12 +330,14 @@ fun MessageDropdownMenu(
             DropdownMenuItem(
                 text = {
                     Text(text = stringResource(id = it.text))
-                }, leadingIcon = {
+                },
+                leadingIcon = {
                     Icon(
                         imageVector = it.icon,
                         contentDescription = null
                     )
-                }, onClick = {
+                },
+                onClick = {
                     onDismissRequest(false)
                     onMenuClick(it)
                 }
@@ -320,7 +345,6 @@ fun MessageDropdownMenu(
         }
     }
 }
-
 
 @Composable
 fun LazyListState.isScrollingUp(): Boolean {

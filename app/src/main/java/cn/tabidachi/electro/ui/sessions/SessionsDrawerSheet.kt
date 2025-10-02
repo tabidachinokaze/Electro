@@ -20,13 +20,12 @@ import androidx.compose.material.icons.rounded.Contacts
 import androidx.compose.material.icons.rounded.GroupAdd
 import androidx.compose.material.icons.rounded.Podcasts
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,8 +36,9 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import cn.tabidachi.electro.R
+import cn.tabidachi.electro.ui.sessions.SessionsContract.Event
+import cn.tabidachi.electro.ui.sessions.SessionsContract.State
 import cn.tabidachi.electro.ui.sessions.components.UserCard
 import coil3.compose.AsyncImage
 
@@ -47,15 +47,13 @@ fun SessionsDrawerSheet(
     modifier: Modifier = Modifier,
     onAvatarClick: () -> Unit,
     onDrawerItemClick: (DrawerSheetItem) -> Unit,
-    addAccount: () -> Unit,
-    switchAccount: () -> Unit
+    state: State,
+    event: (Event) -> Unit
 ) {
-    val viewModel: SessionsViewModel = hiltViewModel()
-    val viewState by viewModel.viewState.collectAsState()
     var isExpand by remember {
         mutableStateOf(false)
     }
-    val users by viewModel.sessions.collectAsState(initial = emptyList())
+    val users = state.sessions
     ModalDrawerSheet(
         windowInsets = WindowInsets.statusBars.only(WindowInsetsSides.Start),
         drawerShape = RectangleShape,
@@ -63,7 +61,7 @@ fun SessionsDrawerSheet(
         Column(
             modifier = modifier
         ) {
-            UserCard(user = viewState.user, onAvatarClick = onAvatarClick, isExpand = isExpand) {
+            UserCard(user = state.user, onAvatarClick = onAvatarClick, isExpand = isExpand) {
                 isExpand = !isExpand
             }
             Column(
@@ -79,7 +77,8 @@ fun SessionsDrawerSheet(
                                 ListItem(
                                     headlineContent = {
                                         Text(text = it.username)
-                                    }, leadingContent = {
+                                    },
+                                    leadingContent = {
                                         AsyncImage(
                                             model = it.avatar,
                                             contentDescription = null,
@@ -87,10 +86,9 @@ fun SessionsDrawerSheet(
                                                 .clip(CircleShape)
                                                 .size(32.dp)
                                         )
-                                    }, modifier = Modifier.clickable {
-                                        viewModel.switchAccount(it.uid) {
-                                            switchAccount()
-                                        }
+                                    },
+                                    modifier = Modifier.clickable {
+                                        event(Event.SwitchAccount(it.uid))
                                     }
                                 )
                             }
@@ -98,22 +96,26 @@ fun SessionsDrawerSheet(
                         ListItem(
                             headlineContent = {
                                 Text(text = stringResource(id = R.string.add_account))
-                            }, leadingContent = {
+                            },
+                            leadingContent = {
                                 Icon(imageVector = Icons.Rounded.Add, contentDescription = null)
-                            }, modifier = Modifier.clickable {
-                                addAccount()
+                            },
+                            modifier = Modifier.clickable {
+                                event(Event.NavigateToAuth)
                             }
                         )
-                        Divider()
+                        HorizontalDivider()
                     }
                 }
-                DrawerSheetItem.values().forEach {
+                DrawerSheetItem.entries.forEach {
                     ListItem(
                         headlineContent = {
                             Text(text = stringResource(id = it.text))
-                        }, leadingContent = {
+                        },
+                        leadingContent = {
                             Icon(imageVector = it.icon, contentDescription = null)
-                        }, modifier = Modifier.clickable {
+                        },
+                        modifier = Modifier.clickable {
                             onDrawerItemClick(it)
                         }
                     )
@@ -124,7 +126,8 @@ fun SessionsDrawerSheet(
 }
 
 enum class DrawerSheetItem(
-    val icon: ImageVector, @StringRes val text: Int
+    val icon: ImageVector,
+    @StringRes val text: Int
 ) {
     CONTACT(Icons.Rounded.Contacts, R.string.contact),
     NEW_GROUP(Icons.Rounded.GroupAdd, R.string.create_new_group),

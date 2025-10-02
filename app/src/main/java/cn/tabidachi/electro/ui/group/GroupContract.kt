@@ -1,0 +1,59 @@
+package cn.tabidachi.electro.ui.group
+
+import android.graphics.Bitmap
+import cn.tabidachi.electro.data.database.entity.Dialog
+import cn.tabidachi.electro.data.database.entity.Session
+import cn.tabidachi.electro.data.database.entity.User
+import cn.tabidachi.electro.model.response.GroupRole
+import moe.tabidachi.compose.mvi.BaseViewModel
+
+interface GroupContract {
+    abstract class ViewModel(initialState: State) :
+        BaseViewModel<State, Event, Effect>(initialState)
+
+    data class State(
+        val dialog: Dialog? = null,
+        val isExit: Boolean = false,
+        val users: List<User> = emptyList(),
+        val roles: List<GroupRole> = emptyList(),
+        val isAdmin: Boolean = false,
+        val owner: Long = 0,
+        val filter: String = "",
+        val contacts: List<User> = emptyList(),
+        val reply: Long? = null,
+        val image: Bitmap? = null,
+        val title: String = "",
+        val isTitleError: Boolean = false,
+        val description: String = "",
+        val processing: Boolean = false,
+        val session: Session? = null,
+    )
+
+    sealed interface Event {
+        data class AddAdmin(val uid: Long) : Event
+        data class GetAdmin(val uid: Long) : Event
+        data class RemoveAdmin(val uid: Long) : Event
+        data class RemoveMember(val uid: Long) : Event
+        data object NavigateUp : Event
+        data class NavigateToPair(val uid: Long) : Event
+        data object ExitGroup : Event
+        data class NavigateToChannelDetail(val sid: Long) : Event
+        data class NavigateToChannelEdit(val sid: Long) : Event
+        data class NavigateToChannelInvite(val sid: Long) : Event
+        data class NavigateToChannelAdmin(val sid: Long) : Event
+        data object GetSessionUser : Event
+        data object GetSessionInfo : Event
+        data object GetContact : Event
+        data class OnFilterChange(val value: String) : Event
+        data class Invite(val uid: Long) : Event
+        data class OnCropSuccess(val value: Bitmap) : Event
+        data object FindSession : Event
+        data object OnDone : Event
+        data class OnTitleChange(val value: String) : Event
+        data class OnDescriptionChange(val value: String) : Event
+    }
+
+    sealed interface Effect {
+        data object NavigateUp : Effect
+    }
+}

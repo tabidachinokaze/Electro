@@ -2,21 +2,19 @@ package cn.tabidachi.electro.ui.settings
 
 import android.app.Application
 import android.graphics.Bitmap
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.core.os.LocaleListCompat
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.datastore.preferences.core.edit
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cn.tabidachi.electro.PreferenceConstant
 import cn.tabidachi.electro.data.Repository
-import cn.tabidachi.electro.data.database.entity.User
 import cn.tabidachi.electro.data.network.Ktor
 import cn.tabidachi.electro.data.network.MinIO
 import cn.tabidachi.electro.ext.MINIO
 import cn.tabidachi.electro.ext.dataStore
 import cn.tabidachi.electro.model.request.UserUpdateRequest
+import cn.tabidachi.electro.ui.settings.SettingsContract.Event
+import cn.tabidachi.electro.ui.settings.SettingsContract.State
 import cn.tabidachi.electro.ui.theme.DarkLight
 import cn.tabidachi.electro.ui.theme.Theme
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -30,12 +28,9 @@ import io.ktor.util.generateNonce
 import io.minio.GetPresignedObjectUrlArgs
 import io.minio.http.Method
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -47,65 +42,73 @@ class SettingsViewModel @Inject constructor(
     private val ktor: Ktor,
     private val minio: MinIO,
     private val repository: Repository
-) : ViewModel() {
-    private val _viewState = MutableStateFlow(SettingViewState())
-    val viewState = _viewState.asStateFlow()
-    var theme by mutableStateOf(Theme.Dynamic)
-    var darkLight by mutableStateOf(DarkLight.SYSTEM)
-    var language by mutableStateOf(Language.SYSTEM)
+) : SettingsContract.ViewModel(State()) {
+    override fun event(event: Event) = when (event) {
+        Event.GetUser -> getUser()
+        Event.Logout -> logout()
+        Event.NavigateToProfile -> Unit
+        Event.NavigateUp -> Unit
+        is Event.OnDayNightMenuVisible -> onDayNightMenuVisible(event.value)
+        is Event.OnDayNightModeChange -> onDayNightModeChange(event.value)
+        Event.OnMenuDismiss -> onMenuDismiss()
+        Event.OnMenuExpand -> onMenuExpand()
+        is Event.OnThemeChange -> onThemeChange(event.value)
+        is Event.OnThemeMenuVisible -> onThemeMenuVisible(event.value)
+        is Event.UpdateAvatar -> updateAvatar(event.value)
+        Event.NavigateToLocaleSettings -> Unit
+    }
 
     init {
         viewModelScope.launch {
             application.dataStore.data.map {
                 it[PreferenceConstant.Key.DARK_LIGHT]
-            }.filterNotNull().collect {
-                darkLight = DarkLight.valueOf(it)
+            }.filterNotNull().collect { value ->
+                updateState { it.copy(darkLight = DarkLight.valueOf(value)) }
             }
         }
         viewModelScope.launch {
             application.dataStore.data.map {
                 it[PreferenceConstant.Key.THEME]
-            }.filterNotNull().filter { it.isNotBlank() }.collect {
-                theme = Theme.valueOf(it)
+            }.filterNotNull().filter { it.isNotBlank() }.collect { value ->
+                updateState { it.copy(theme = Theme.valueOf(value)) }
             }
         }
     }
 
-    fun onMenuExpand() {
-        _viewState.update { it.copy(isMenuExpanded = true) }
+    private fun onMenuExpand() {
+        updateState { it.copy(isMenuExpanded = true) }
     }
 
-    fun onMenuDismiss() {
-        _viewState.update { it.copy(isMenuExpanded = false) }
+    private fun onMenuDismiss() {
+        updateState { it.copy(isMenuExpanded = false) }
     }
 
-    fun getUser() {
+    private fun getUser() {
         viewModelScope.launch {
             ktor.getUser(ktor.uid).onSuccess {
                 it.data?.let { user ->
-                    _viewState.update { it.copy(user = user) }
+                    updateState { it.copy(user = user) }
                 }
             }
         }
     }
 
-    fun onEmailDialogDismiss() {
-        _viewState.update { it.copy(isEmailDialogVisible = false) }
+    private fun onEmailDialogDismiss() {
+        updateState { it.copy(isEmailDialogVisible = false) }
     }
 
-    fun onEmailDialogShow() {
-        _viewState.update { it.copy(isEmailDialogVisible = true) }
+    private fun onEmailDialogShow() {
+        updateState { it.copy(isEmailDialogVisible = true) }
     }
 
-    fun onEmailDialogConfirm() {
-
+    private fun onEmailDialogConfirm() {
     }
 
-    fun onNewEmailValueChange(value: String) {
-        _viewState.update { it.copy(newEmail = value) }
+    private fun onNewEmailValueChange(value: String) {
+        updateState { it.copy(newEmail = value) }
     }
 
-    fun updateAvatar(bitmap: Bitmap) {
+    private fun updateAvatar(bitmap: ImageBitmap) {
         viewModelScope.launch {
             minio.checkOrCreateBucket(MinIO.AVATAR)
             val filename = generateNonce()
@@ -119,7 +122,7 @@ class SettingsViewModel @Inject constructor(
             withContext(Dispatchers.IO) {
                 val outputStream = ByteArrayOutputStream()
                 kotlin.runCatching {
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
+                    bitmap.asAndroidBitmap().compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
                     ktor.upload.put(url) {
                         setBody(outputStream.toByteArray())
                     }
@@ -141,7 +144,7 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun logout() {
+    private fun logout() {
         viewModelScope.launch {
             repository.removeAccount(ktor.uid)
             application.dataStore.edit {
@@ -151,7 +154,7 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun onDayNightModeChange(darkLight: DarkLight) {
+    private fun onDayNightModeChange(darkLight: DarkLight) {
         viewModelScope.launch {
             application.dataStore.edit {
                 it[PreferenceConstant.Key.DARK_LIGHT] = darkLight.name
@@ -159,11 +162,11 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun onDayNightMenuVisible(value: Boolean) {
-        _viewState.update { it.copy(isDayNightMenuExpanded = value) }
+    private fun onDayNightMenuVisible(value: Boolean) {
+        updateState { it.copy(isDayNightMenuExpanded = value) }
     }
 
-    fun onThemeChange(theme: Theme) {
+    private fun onThemeChange(theme: Theme) {
         viewModelScope.launch {
             application.dataStore.edit {
                 it[PreferenceConstant.Key.THEME] = theme.name
@@ -171,28 +174,7 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun onLanguageChange(language: Language) {
-        viewModelScope.launch {
-            val languageTags = LocaleListCompat.forLanguageTags(language.tag)
-            //AppCompatDelegate.setApplicationLocales(languageTags)
-        }
-    }
-
-    fun onLanguageMenuVisible(value: Boolean) {
-        _viewState.update { it.copy(isLanguageMenuExpanded = value) }
-    }
-
-    fun onThemeMenuVisible(value: Boolean) {
-        _viewState.update { it.copy(isThemeMenuExpanded = value) }
+    private fun onThemeMenuVisible(value: Boolean) {
+        updateState { it.copy(isThemeMenuExpanded = value) }
     }
 }
-
-data class SettingViewState(
-    val user: User = User(-1, "", "", ""),
-    val isMenuExpanded: Boolean = false,
-    val isEmailDialogVisible: Boolean = false,
-    val newEmail: String = "",
-    val isDayNightMenuExpanded: Boolean = false,
-    val isLanguageMenuExpanded: Boolean = false,
-    val isThemeMenuExpanded: Boolean = false,
-)

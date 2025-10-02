@@ -1,30 +1,50 @@
 package cn.tabidachi.electro.ui.channel
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.composable
+import cn.tabidachi.electro.ui.channel.ChannelContract.Effect
+import cn.tabidachi.electro.ui.channel.ChannelContract.Event
+import cn.tabidachi.electro.ui.common.MessageAction
+import cn.tabidachi.electro.ui.pair.navigateToPair
+import kotlinx.serialization.Serializable
+import moe.tabidachi.compose.mvi.observe
 
-@Composable
-fun ChannelRoute(
-    coordinator: ChannelCoordinator = rememberChannelCoordinator()
-) {
-    // State observing and declarations
-    val uiState by coordinator.screenStateFlow.collectAsStateWithLifecycle(ChannelState())
+@Serializable
+data class ChannelRoute(val sid: Long)
 
-    // UI Actions
-    val actions = rememberChannelActions(coordinator)
-
-    // UI Rendering
-//    ChannelScreen(uiState, actions)
+context(navController: NavHostController)
+fun NavGraphBuilder.channel() = composable<ChannelRoute> {
+    val viewModel: ChannelViewModel = hiltViewModel()
+    val (state, event) = viewModel.observe {
+        when (it) {
+            Effect.NavigateUp -> navController.navigateUp()
+        }
+    }
+    ChannelScreen(
+        state = state.value,
+        event = {
+            when (it) {
+                is Event.NavigateToChannelAdmin -> navController.navigateToChannelAdmin()
+                is Event.NavigateToChannelDetail -> navController.navigateToChannelDetail()
+                is Event.NavigateToChannelEdit -> navController.navigateToChannelEdit()
+                is Event.NavigateToChannelInvite -> navController.navigateToChannelInvite()
+                is Event.NavigateToPair -> navController.navigateToPair(it.uid)
+                Event.NavigateUp -> navController.navigateUp()
+                else -> event(it)
+            }
+        },
+        messenger = viewModel.messenger,
+        messageManager = viewModel.messageManager,
+        action = MessageAction(
+            navigateToPair = {
+                navController.navigateToPair(it)
+            }
+        )
+    )
 }
 
-
-@Composable
-fun rememberChannelActions(coordinator: ChannelCoordinator): ChannelActions {
-    return remember(coordinator) {
-        ChannelActions(
-            onClick = coordinator::doStuff
-        )
-    }
+fun NavHostController.navigateToChannel(sid: Long) {
+    navigate(ChannelRoute(sid))
 }

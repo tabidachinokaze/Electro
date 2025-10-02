@@ -1,16 +1,26 @@
 package cn.tabidachi.electro.ui.channel
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.toRoute
 import cn.tabidachi.electro.data.Repository
 import cn.tabidachi.electro.data.network.Ktor
 import cn.tabidachi.electro.data.network.MinIO
 import cn.tabidachi.electro.ext.MINIO
+import cn.tabidachi.electro.model.BaseMessenger
 import cn.tabidachi.electro.model.Messenger
 import cn.tabidachi.electro.model.request.ChannelUpdateRequest
 import cn.tabidachi.electro.model.response.ChannelRoleType
+import cn.tabidachi.electro.ui.channel.ChannelContract.Effect
+import cn.tabidachi.electro.ui.channel.ChannelContract.Event
+import cn.tabidachi.electro.ui.channel.ChannelContract.State
+import cn.tabidachi.electro.ui.common.MessageManager
+import cn.tabidachi.electro.ui.common.MessageManagerImpl
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.HttpStatusCode
@@ -21,137 +31,174 @@ import io.ktor.util.generateNonce
 import io.minio.GetPresignedObjectUrlArgs
 import io.minio.http.Method
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
-import kotlin.reflect.KFunction0
 
 @HiltViewModel
 class ChannelViewModel @Inject constructor(
-    override val repository: Repository,
-    override val ktor: Ktor,
-    private val minio: MinIO
-) : Messenger(repository, ktor) {
-
-    private val _viewState: MutableStateFlow<ChannelState> = MutableStateFlow(ChannelState())
-
-    val viewState: StateFlow<ChannelState> = _viewState.asStateFlow()
-
-    private val job1 = initMessage()
-    private val job2 = initWebSocket()
+    @ApplicationContext
+    private val context: Context,
+    private val repository: Repository,
+    private val ktor: Ktor,
+    private val minio: MinIO,
+    savedStateHandle: SavedStateHandle
+) : ChannelContract.ViewModel(initialState = State()) {
+    private val route = savedStateHandle.toRoute<ChannelRoute>()
+    val messenger: Messenger = BaseMessenger(
+        repository = repository,
+        ktor = ktor,
+        scope = viewModelScope,
+        sid = route.sid
+    )
+    val messageManager: MessageManager = MessageManagerImpl(
+        context = context,
+        repository = repository,
+        ktor = ktor,
+        scope = viewModelScope
+    )
 
     init {
         viewModelScope.launch {
-            sid.collect { sid ->
-                getSessionInfo(sid)
-                getSessionUser(sid)
-            }
+            getSessionInfo(route.sid)
+            getSessionUser(route.sid)
         }
+        event(Event.GetAdmin(route.sid))
     }
 
-    override suspend fun getSessionId(): Long {
-        return sid.value
+    override fun event(event: Event) = when (event) {
+        is Event.AddAdmin -> addAdmin(event.uid)
+        is Event.RemoveAdmin -> removeAdmin(event.uid)
+        is Event.RemoveMember -> removeMember(event.uid)
+        is Event.GetAdmin -> handleOneTimeEvent(event) { getAdmin(event.uid) }
+        is Event.NavigateToPair -> Unit
+        Event.NavigateUp -> Unit
+        Event.ExitGroup -> exitGroup(route.sid)
+        is Event.NavigateToChannelDetail -> Unit
+        Event.GetSessionInfo -> handleOneTimeEvent(event) { getSessionInfo(route.sid) }
+        Event.GetSessionUser -> handleOneTimeEvent(event) { getSessionUser(route.sid) }
+        is Event.NavigateToChannelAdmin -> Unit
+        is Event.NavigateToChannelEdit -> Unit
+        is Event.NavigateToChannelInvite -> Unit
+        Event.FindSession -> findSession()
+        Event.GetContact -> getContact()
+        is Event.Invite -> invite(event.uid)
+        is Event.OnCropSuccess -> onCropSuccess(event.value)
+        Event.OnDone -> onDone()
+        is Event.OnFilterChange -> onFilterChange(event.value)
+        is Event.OnDescriptionChange -> onDescriptionChange(event.value)
+        is Event.OnTitleChange -> onTitleChange(event.value)
     }
 
-    fun getSessionInfo(sid: Long) {
+    private fun getSessionInfo(sid: Long) {
         viewModelScope.launch {
             repository.getDialog(sid).collect { dialog ->
-                _viewState.update { it.copy(dialog = dialog) }
+                updateState { it.copy(dialog = dialog) }
             }
         }
     }
 
-    fun getSessionUser(sid: Long) {
+    private fun getSessionUser(sid: Long) {
         viewModelScope.launch {
             repository.getSessionUser(sid).collect {
                 it.mapNotNull {
                     repository.getUser(it).getOrNull()?.data
                 }.also { users ->
-                    _viewState.update { it.copy(users = users) }
+                    updateState { it.copy(users = users) }
                 }.forEach {
-                    listen(it.uid)
+                    messenger.listen(it.uid)
                 }
             }
         }
     }
 
-    fun getAdmin(sid: Long) = viewModelScope.launch {
-        repository.getChannelAdmins(sid).onSuccess {
-            it.data?.also { roles ->
-                Log.d("ChannelViewModel", "getAdmin: ${roles.size}")
-                val isAdmin = roles.any { it.uid == ktor.uid }
-                val owner = roles.firstOrNull { it.type == ChannelRoleType.OWNER }
-                _viewState.update { it.copy(roles = roles, isAdmin = isAdmin, canSendMessage = isAdmin) }
-                if (owner != null) {
-                    _viewState.update { it.copy(owner = owner.uid) }
-                }
-            }
-        }
-    }
-
-    fun removeAdmin(target: Long) {
+    private fun getAdmin(sid: Long) {
         viewModelScope.launch {
-            repository.removeChannelAdmin(sid.value, target).onSuccess {
-                if (it.status == HttpStatusCode.OK.value) it.data?.let { target ->
-                    _viewState.update {
+            repository.getChannelAdmins(sid).onSuccess {
+                it.data?.also { roles ->
+                    Log.d("ChannelViewModel", "getAdmin: ${roles.size}")
+                    val isAdmin = roles.any { it.uid == ktor.uid }
+                    val owner = roles.firstOrNull { it.type == ChannelRoleType.OWNER }
+                    updateState {
                         it.copy(
-                            roles = it.roles.toMutableList().apply {
-                                removeIf {
-                                    it.uid == target
+                            roles = roles,
+                            isAdmin = isAdmin,
+                            canSendMessage = isAdmin
+                        )
+                    }
+                    if (owner != null) {
+                        updateState { it.copy(owner = owner.uid) }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun removeAdmin(target: Long) {
+        viewModelScope.launch {
+            repository.removeChannelAdmin(route.sid, target).onSuccess {
+                if (it.status == HttpStatusCode.OK.value) {
+                    it.data?.let { target ->
+                        updateState {
+                            it.copy(
+                                roles = it.roles.toMutableList().apply {
+                                    removeIf {
+                                        it.uid == target
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }
         }
     }
 
-    fun addAdmin(target: Long) {
+    private fun addAdmin(target: Long) {
         viewModelScope.launch {
-            repository.addChannelAdmin(sid.value, target).onSuccess {
-                if (it.status == HttpStatusCode.OK.value) it.data?.let { role ->
-                    _viewState.update {
-                        it.copy(
-                            roles = it.roles.toMutableList().apply {
-                                add(role)
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    fun removeMember(target: Long) {
-        viewModelScope.launch {
-            repository.removeChannelMember(sid.value, target).onSuccess {
-                if (it.status == HttpStatusCode.OK.value) it.data?.let { target ->
-                    _viewState.update {
-                        it.copy(
-                            users = it.users.toMutableList().apply {
-                                removeIf {
-                                    it.uid == target
+            repository.addChannelAdmin(route.sid, target).onSuccess {
+                if (it.status == HttpStatusCode.OK.value) {
+                    it.data?.let { role ->
+                        updateState {
+                            it.copy(
+                                roles = it.roles.toMutableList().apply {
+                                    add(role)
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }
         }
     }
 
-    fun onFilterChange(filter: String) {
-        _viewState.update { it.copy(filter = filter) }
+    private fun removeMember(target: Long) {
+        viewModelScope.launch {
+            repository.removeChannelMember(route.sid, target).onSuccess {
+                if (it.status == HttpStatusCode.OK.value) {
+                    it.data?.let { target ->
+                        updateState {
+                            it.copy(
+                                users = it.users.toMutableList().apply {
+                                    removeIf {
+                                        it.uid == target
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    fun invite(target: Long) {
-        val sid = sid.value
+    private fun onFilterChange(filter: String) {
+        updateState { it.copy(filter = filter) }
+    }
+
+    private fun invite(target: Long) {
+        val sid = route.sid
         viewModelScope.launch {
             repository.invite(sid, target).onSuccess {
                 it.data?.let {
@@ -161,56 +208,56 @@ class ChannelViewModel @Inject constructor(
         }
     }
 
-    fun getContact() {
+    private fun getContact() {
         viewModelScope.launch {
             repository.contact().onSuccess {
                 it.data?.mapNotNull {
                     repository.getUser(it).getOrNull()?.data
                 }?.let { contacts ->
-                    _viewState.update { it.copy(contacts = contacts) }
+                    updateState { it.copy(contacts = contacts) }
                 }
             }
         }
     }
 
-    fun exitGroup(sid: Long, onSuccess: KFunction0<Unit>) {
+    private fun exitGroup(sid: Long) {
         viewModelScope.launch {
             repository.exitSession(sid).onSuccess {
                 it.data?.let {
-                    _viewState.update { it.copy(isExit = true) }
-                    onSuccess()
+                    updateState { it.copy(isExit = true) }
+                    emitEffect(Effect.NavigateUp)
                 }
             }
         }
     }
 
-    fun onCropSuccess(bitmap: Bitmap) {
-        _viewState.update { it.copy(image = bitmap) }
+    private fun onCropSuccess(bitmap: Bitmap) {
+        updateState { it.copy(image = bitmap) }
     }
 
-    fun onDone(callback: () -> Unit) {
+    private fun onDone() {
         viewModelScope.launch {
-            val viewState = _viewState.value
-            val sid = this@ChannelViewModel.sid.value
+            val viewState = state.value
+            val sid = route.sid
             val image = viewState.image?.let {
                 uploadImage(it) ?: return@launch
             }
             val title = viewState.title.ifBlank { null }
             if (title.isNullOrBlank()) {
-                _viewState.update { it.copy(isTitleError = true) }
+                updateState { it.copy(isTitleError = true) }
                 return@launch
             }
             val description = viewState.description.ifBlank { null }
             repository.updateChannelInfo(sid, ChannelUpdateRequest(image, title, description))
                 .onSuccess {
                     it.data?.let {
-                        callback()
+                        emitEffect(Effect.NavigateUp)
                     }
                 }
         }
     }
 
-    suspend fun uploadImage(bitmap: Bitmap): String? {
+    private suspend fun uploadImage(bitmap: Bitmap): String? {
         minio.checkOrCreateBucket(MinIO.AVATAR)
         val filename = generateNonce()
         val url = minio.client.getPresignedObjectUrl(
@@ -223,7 +270,7 @@ class ChannelViewModel @Inject constructor(
         return withContext(Dispatchers.IO) {
             ByteArrayOutputStream().use { outputStream ->
                 if (
-                    kotlin.runCatching {
+                    runCatching {
                         bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
                         ktor.upload.put(url) {
                             setBody(outputStream.toByteArray())
@@ -236,38 +283,32 @@ class ChannelViewModel @Inject constructor(
                             pathSegments = listOf(MinIO.AVATAR, filename)
                         )
                     ).toString()
-                } else null
-            }
-        }
-    }
-
-    fun findSession() {
-        viewModelScope.launch {
-            sid.value.let {
-                repository.findSession(it).collect { session ->
-                    _viewState.update {
-                        it.copy(
-                            session = session,
-                            title = session.title ?: "",
-                            description = session.description ?: ""
-                        )
-                    }
+                } else {
+                    null
                 }
             }
         }
     }
 
-    fun onTitleChange(value: String) {
-        _viewState.update { it.copy(title = value, isTitleError = false) }
+    private fun findSession() {
+        viewModelScope.launch {
+            repository.findSession(route.sid).collect { session ->
+                updateState {
+                    it.copy(
+                        session = session,
+                        title = session.title ?: "",
+                        description = session.description ?: ""
+                    )
+                }
+            }
+        }
     }
 
-    fun onDescriptionChange(value: String) {
-        _viewState.update { it.copy(description = value) }
+    private fun onTitleChange(value: String) {
+        updateState { it.copy(title = value, isTitleError = false) }
     }
 
-    override fun onCleared() {
-        job1.cancel()
-        job2.cancel()
-        super.onCleared()
+    private fun onDescriptionChange(value: String) {
+        updateState { it.copy(description = value) }
     }
 }

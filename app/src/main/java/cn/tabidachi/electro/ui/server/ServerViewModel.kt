@@ -1,61 +1,60 @@
 package cn.tabidachi.electro.ui.server
 
-import androidx.lifecycle.ViewModel
 import cn.tabidachi.electro.data.network.Ktor
+import cn.tabidachi.electro.ui.server.ServerContract.Event
+import cn.tabidachi.electro.ui.server.ServerContract.State
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.ktor.client.plugins.defaultRequest
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
 @HiltViewModel
 class ServerViewModel @Inject constructor(
     val ktor: Ktor
-) : ViewModel() {
+) : ServerContract.ViewModel(State()) {
+    override fun event(event: Event) = when (event) {
+        Event.HideDialog -> hideDialog()
+        is Event.OnDialogValueChange -> onDialogValueChange(event.value)
+        Event.OnSave -> onSave()
+        is Event.ShowDialog -> showDialog(event.value)
+    }
 
-    private val _state: MutableStateFlow<ServerState> = MutableStateFlow(ServerState())
-
-    val state: StateFlow<ServerState> = _state.asStateFlow()
-
-    fun showDialog(type: ServerDialogType) {
-        _state.update {
+    private fun showDialog(type: ServerDialogType) {
+        updateState {
             it.copy(
                 dialogType = type,
                 dialogVisible = true,
                 dialogValue = when (type) {
-                    ServerDialogType.ElectroUrl -> _state.value.url
-                    ServerDialogType.ElectroPort -> _state.value.port
-                    ServerDialogType.MinioUrl -> _state.value.minioUrl
-                    ServerDialogType.MinioPort -> _state.value.minioPort
+                    ServerDialogType.ElectroUrl -> state.value.url
+                    ServerDialogType.ElectroPort -> state.value.port
+                    ServerDialogType.MinioUrl -> state.value.minioUrl
+                    ServerDialogType.MinioPort -> state.value.minioPort
                 }
             )
         }
     }
 
-    fun hideDialog() = _state.update { it.copy(dialogVisible = false, dialogValue = "") }
+    private fun hideDialog() = updateState { it.copy(dialogVisible = false, dialogValue = "") }
 
-    fun onSave() {
-        when (_state.value.dialogType) {
-            ServerDialogType.ElectroUrl -> _state.update { it.copy(url = it.dialogValue) }
-            ServerDialogType.ElectroPort -> _state.update { it.copy(port = it.dialogValue) }
-            ServerDialogType.MinioUrl -> _state.update { it.copy(minioUrl = it.dialogValue) }
-            ServerDialogType.MinioPort -> _state.update { it.copy(minioPort = it.dialogValue) }
+    private fun onSave() {
+        when (state.value.dialogType) {
+            ServerDialogType.ElectroUrl -> updateState { it.copy(url = it.dialogValue) }
+            ServerDialogType.ElectroPort -> updateState { it.copy(port = it.dialogValue) }
+            ServerDialogType.MinioUrl -> updateState { it.copy(minioUrl = it.dialogValue) }
+            ServerDialogType.MinioPort -> updateState { it.copy(minioPort = it.dialogValue) }
         }
 
         hideDialog()
 
         ktor.client.config {
             defaultRequest {
-                this.host = _state.value.url
-                this.port = _state.value.port.toInt()
+                this.host = state.value.url
+                this.port = state.value.port.toInt()
             }
         }
     }
 
-    fun onDialogValueChange(value: String) {
-        _state.update {
+    private fun onDialogValueChange(value: String) {
+        updateState {
             it.copy(dialogValue = value)
         }
     }

@@ -1,7 +1,8 @@
 package cn.tabidachi.electro.ui.common
 
 import android.Manifest
-import android.app.Application
+import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -39,9 +40,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.view.ContentInfoCompat
 import androidx.core.view.OnReceiveContentListener
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import cn.tabidachi.electro.LocationActivity
 import cn.tabidachi.electro.R
 import cn.tabidachi.electro.coil.BlurTransformation
@@ -76,20 +74,20 @@ import coil3.size.Scale
 import coil3.toBitmap
 import com.amap.api.maps.model.LatLng
 import com.amap.api.services.core.PoiItemV2
-import dagger.hilt.android.lifecycle.HiltViewModel
 import io.ktor.http.ContentType
 import io.ktor.util.generateNonce
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
-import javax.inject.Inject
 
 @Composable
 fun BottomMessageField(
@@ -133,17 +131,17 @@ fun BottomMessageField(
 @Composable
 fun BottomMessageField(
     modifier: Modifier = Modifier,
-    viewModel: MessageViewModel = hiltViewModel(),
+    messageManager: MessageManager,
     sessionIdRequest: suspend () -> Long?,
     replyRequest: suspend () -> Long?,
     replyContent: @Composable () -> Unit,
     onSuccess: () -> Unit,
 ) {
-    val viewState by viewModel.viewState.collectAsState()
+    val state by messageManager.viewState.collectAsState()
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents(),
         onResult = {
-            it.forEach(viewModel::onFileAttachment)
+            it.forEach(messageManager::onFileAttachment)
         }
     )
     val context = LocalContext.current
@@ -152,7 +150,7 @@ fun BottomMessageField(
         onResult = {
             if (it.resultCode == 114514) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    viewModel.sendLocationMessage(
+                    messageManager.sendLocationMessage(
                         sessionIdRequest,
                         it.data?.extras?.getParcelable("attachment", LocationAttachment::class.java)
                     )
@@ -167,33 +165,38 @@ fun BottomMessageField(
         Column {
             replyContent()
             AttachmentRow(
-                attachments = viewState.attachments,
-                onAttachmentRemove = viewModel::onAttachmentRemove,
+                attachments = state.attachments,
+                onAttachmentRemove = messageManager::onAttachmentRemove,
                 modifier = Modifier.padding(top = 8.dp)
             )
-            AnimatedContent(targetState = viewState.isRecording, label = "") {
+            AnimatedContent(targetState = state.isRecording, label = "") {
                 if (it) {
                     Recording(
-                        duration = viewState.duration,
-                        onCancel = viewModel::onRecordStop,
+                        duration = state.duration,
+                        onCancel = messageManager::onRecordStop,
                         onCompleted = {
-                            viewModel.onRecordCompleted(sessionIdRequest, replyRequest, onSuccess)
-                        }, modifier = Modifier
+                            messageManager.onRecordCompleted(
+                                sessionIdRequest,
+                                replyRequest,
+                                onSuccess
+                            )
+                        },
+                        modifier = Modifier
                             .padding(horizontal = 8.dp)
                             .padding(vertical = 8.dp)
                     )
                 } else {
                     MessageTextField(
-                        text = viewState.text,
-                        onTextValueChange = viewModel::onTextValueChange
+                        text = state.text,
+                        onTextValueChange = messageManager::onTextValueChange
                     )
                 }
             }
             AttachmentSelector(
-                sendButtonEnabled = viewState.attachments.isNotEmpty() || viewState.text.isNotEmpty(),
-                isProcessing = viewState.isProcessing,
+                sendButtonEnabled = state.attachments.isNotEmpty() || state.text.isNotEmpty(),
+                isProcessing = state.isProcessing,
                 onSend = {
-                    viewModel.onSend(
+                    messageManager.onSend(
                         sessionIdRequest = sessionIdRequest,
                         replyRequest = replyRequest,
                         onSuccess = onSuccess
@@ -213,8 +216,8 @@ fun BottomMessageField(
                 modifier = Modifier
                     .navigationBarsPadding()
                     .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
-                isRecording = viewState.isRecording,
-                onRecording = viewModel::onRecording,
+                isRecording = state.isRecording,
+                onRecording = messageManager::onRecording,
             )
         }
     }
@@ -245,21 +248,87 @@ fun Recording(
     }
 }
 
-@HiltViewModel
-class MessageViewModel @Inject constructor(
-    private val application: Application,
+interface MessageManager : OnReceiveContentListener {
+    val viewState: StateFlow<MessageViewState>
+    fun onTextValueChange(text: String)
+    fun onRecording()
+    fun onRecordCompleted(
+        sessionIdRequest: suspend () -> Long?,
+        replyRequest: suspend () -> Long?,
+        onSuccess: () -> Unit
+    )
+
+    fun onRecordStop()
+    fun onFileAttachment(uri: Uri)
+    fun onAttachmentRemove(attachment: Attachment)
+    fun onSend(
+        sessionIdRequest: suspend () -> Long?,
+        replyRequest: suspend () -> Long?,
+        onSuccess: () -> Unit
+    )
+
+    fun sendLocationMessage(
+        sessionIdRequest: suspend () -> Long?,
+        attachment: LocationAttachment?
+    )
+}
+
+object EmptyMessageManager : MessageManager {
+    override val viewState: StateFlow<MessageViewState> = MutableStateFlow(MessageViewState())
+
+    override fun onTextValueChange(text: String) {}
+
+    override fun onRecording() {}
+
+    override fun onRecordCompleted(
+        sessionIdRequest: suspend () -> Long?,
+        replyRequest: suspend () -> Long?,
+        onSuccess: () -> Unit
+    ) {
+    }
+
+    override fun onRecordStop() {}
+
+    override fun onFileAttachment(uri: Uri) {}
+
+    override fun onAttachmentRemove(attachment: Attachment) {}
+
+    override fun onSend(
+        sessionIdRequest: suspend () -> Long?,
+        replyRequest: suspend () -> Long?,
+        onSuccess: () -> Unit
+    ) {
+    }
+
+    override fun sendLocationMessage(
+        sessionIdRequest: suspend () -> Long?,
+        attachment: LocationAttachment?
+    ) {
+    }
+
+    override fun onReceiveContent(
+        view: View,
+        payload: ContentInfoCompat
+    ): ContentInfoCompat? {
+        return null
+    }
+}
+
+class MessageManagerImpl(
+    private val context: Context,
     private val repository: Repository,
     private val ktor: Ktor,
-) : ViewModel(), OnReceiveContentListener {
+    val scope: CoroutineScope
+) : MessageManager {
     private val _viewState = MutableStateFlow(MessageViewState())
-    val viewState = _viewState.asStateFlow()
+    override val viewState = _viewState.asStateFlow()
     private var recorder: MediaRecorder? = null
     private var recordedFile: File? = null
     private var startTime: Long = 0
     private var stopTime: Long = 0
     private var recordingJob: Job? = null
 
-    fun onTextValueChange(text: String) {
+    override fun onTextValueChange(text: String) {
         _viewState.update { it.copy(text = text) }
     }
 
@@ -274,19 +343,19 @@ class MessageViewModel @Inject constructor(
         attachment?.let(_viewState.value.attachments::add)
     }
 
-    fun onRecording() {
+    override fun onRecording() {
         Playable.playFlow.value = 0
         if (_viewState.value.isRecording) return
         onRecordStop()
-        if (!application.checkPermission(Manifest.permission.RECORD_AUDIO)) return
+        if (!context.checkPermission(Manifest.permission.RECORD_AUDIO)) return
         recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            MediaRecorder(application)
+            MediaRecorder(context)
         } else {
             MediaRecorder()
         }.apply {
             setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION)
             setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP)
-            recordedFile = File(application.getExternalFilesDir(null), generateNonce())
+            recordedFile = File(context.getExternalFilesDir(null), generateNonce())
             setOutputFile(recordedFile)
             setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB)
             kotlin.runCatching {
@@ -295,7 +364,7 @@ class MessageViewModel @Inject constructor(
                 startTime = System.currentTimeMillis()
                 _viewState.update { it.copy(isRecording = true) }
                 Playable.enabled = false
-                recordingJob = viewModelScope.launch {
+                recordingJob = scope.launch {
                     while (_viewState.value.isRecording) {
                         _viewState.update { it.copy(duration = System.currentTimeMillis() - startTime) }
                         delay(250)
@@ -308,26 +377,28 @@ class MessageViewModel @Inject constructor(
         }
     }
 
-    fun onRecordCompleted(
+    override fun onRecordCompleted(
         sessionIdRequest: suspend () -> Long?,
         replyRequest: suspend () -> Long?,
         onSuccess: () -> Unit
-    ) = viewModelScope.launch(Dispatchers.IO) {
-        onRecordStop()
-        val attachment = VoiceAttachment {
-            application.contentResolver.getType(Uri.fromFile(recordedFile))?.let(::contentType::set)
-            recordedFile?.length()?.let(::size::set)
-            duration = stopTime - startTime
+    ) {
+        scope.launch(Dispatchers.IO) {
+            onRecordStop()
+            val attachment = VoiceAttachment {
+                context.contentResolver.getType(Uri.fromFile(recordedFile))?.let(::contentType::set)
+                recordedFile?.length()?.let(::size::set)
+                duration = stopTime - startTime
+            }
+            val reply = replyRequest()
+            val sid = sessionIdRequest() ?: return@launch
+            val message = createAttachmentMessage(sid, reply, attachment)
+            repository.saveResource(Path(message.identification(), recordedFile.toString()))
+            repository.addMessageRequest(message)
+            onSuccess()
         }
-        val reply = replyRequest()
-        val sid = sessionIdRequest() ?: return@launch
-        val message = createAttachmentMessage(sid, reply, attachment)
-        repository.saveResource(Path(message.identification(), recordedFile.toString()))
-        repository.addMessageRequest(message)
-        onSuccess()
     }
 
-    fun onRecordStop() {
+    override fun onRecordStop() {
         stopTime = System.currentTimeMillis()
         recordingJob?.cancel()
         recorder?.stop()
@@ -337,105 +408,113 @@ class MessageViewModel @Inject constructor(
         Playable.enabled = true
     }
 
-    fun onFileAttachment(uri: Uri) = viewModelScope.launch(Dispatchers.IO) {
-        if (_viewState.value.attachments.any {
-                when (val attachment = it) {
-                    is AudioAttachment -> attachment.uri == uri.toString()
-                    is FileAttachment -> attachment.uri == uri.toString()
-                    is ImageAttachment -> attachment.uri == uri.toString()
-                    is VideoAttachment -> attachment.uri == uri.toString()
-                    is VoiceAttachment -> attachment.uri == uri.toString()
-                    is LocationAttachment -> false
-                    is WebRTCAttachment -> false
-                }
-            }) {
-            return@launch
-        }
-        val type = application.contentResolver.getType(uri)
-        val uriDetail = uri.openableColumns(application.contentResolver).getOrNull()
-        val uriString = uri.toString()
-        when {
-            type == null -> {
-                FileAttachment {
-                    contentType = "*/*"
-                    this.uri = uriString
-                    uriDetail?.name?.let(this::filename::set)
-                    uriDetail?.size?.let(this::size::set)
-                }
-            }
-
-            ContentType.parse(type).match(ContentType.Audio.Any) -> {
-                AudioAttachment {
-                    contentType = type
-                    this.uri = uriString
-                    uriDetail?.name?.let(this::filename::set)
-                    uriDetail?.size?.let(this::size::set)
-                    kotlin.runCatching {
-                        val retriever = MediaMetadataRetriever()
-                        retriever.setDataSource(application, uri)
-                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
-                            ?.let(::title::set)
-                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
-                            ?.let(::artist::set)
-                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                            ?.toLongOrNull()?.let(::duration::set)
-                        retriever.embeddedPicture?.let(::loadInSize)?.let(::blur)?.let(::blur)
-                            ?.let(::blur)?.let(::quality)?.let(::artwork::set)
-                    }.onFailure {
-                        it.printStackTrace()
+    override fun onFileAttachment(uri: Uri) {
+        scope.launch(Dispatchers.IO) {
+            if (_viewState.value.attachments.any {
+                    when (val attachment = it) {
+                        is AudioAttachment -> attachment.uri == uri.toString()
+                        is FileAttachment -> attachment.uri == uri.toString()
+                        is ImageAttachment -> attachment.uri == uri.toString()
+                        is VideoAttachment -> attachment.uri == uri.toString()
+                        is VoiceAttachment -> attachment.uri == uri.toString()
+                        is LocationAttachment -> false
+                        is WebRTCAttachment -> false
                     }
                 }
+            ) {
+                return@launch
             }
-
-            ContentType.parse(type).match(ContentType.Image.Any) -> {
-                val bounds = getImageBounds(uri)
-                ImageAttachment {
-                    contentType = type
-                    this.uri = uriString
-                    uriDetail?.name?.let(this::filename::set)
-                    uriDetail?.size?.let(this::size::set)
-                    width = bounds.outWidth
-                    height = bounds.outHeight
-                    thumb = uri.let(::loadInSize)?.let(::blur)?.let(::blur)?.let(::blur)?.let(::blur)
-                        ?.let(::quality)
-                }
-            }
-
-            ContentType.parse(type).match(ContentType.Video.Any) -> {
-                VideoAttachment {
-                    contentType = type
-                    this.uri = uriString
-                    uriDetail?.name?.let(this::filename::set)
-                    uriDetail?.size?.let(this::size::set)
-                    kotlin.runCatching {
-                        val retriever = MediaMetadataRetriever()
-                        retriever.setDataSource(application, uri)
-                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
-                            ?.toIntOrNull()?.let(this::width::set)
-                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
-                            ?.toIntOrNull()?.let(this::height::set)
-                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                            ?.toLongOrNull()?.let(this::duration::set)
-                        this.thumb =
-                            (retriever.embeddedPicture ?: retriever.frameAtTime)?.let(::loadInSize)
-                                ?.let(::blur)?.let(::blur)?.let(::blur)?.let(::quality)
-                        retriever.release()
-                    }.onFailure {
-                        it.printStackTrace()
+            val type = context.contentResolver.getType(uri)
+            val uriDetail = uri.openableColumns(context.contentResolver).getOrNull()
+            val uriString = uri.toString()
+            when {
+                type == null -> {
+                    FileAttachment {
+                        contentType = "*/*"
+                        this.uri = uriString
+                        uriDetail?.name?.let(this::filename::set)
+                        uriDetail?.size?.let(this::size::set)
                     }
                 }
-            }
 
-            else -> {
-                FileAttachment {
-                    contentType = type
-                    this.uri = uriString
-                    uriDetail?.name?.let(this::filename::set)
-                    uriDetail?.size?.let(this::size::set)
+                ContentType.parse(type).match(ContentType.Audio.Any) -> {
+                    AudioAttachment {
+                        contentType = type
+                        this.uri = uriString
+                        uriDetail?.name?.let(this::filename::set)
+                        uriDetail?.size?.let(this::size::set)
+                        kotlin.runCatching {
+                            val retriever = MediaMetadataRetriever()
+                            retriever.setDataSource(context, uri)
+                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+                                ?.let(::title::set)
+                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                                ?.let(::artist::set)
+                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                ?.toLongOrNull()?.let(::duration::set)
+                            retriever.embeddedPicture?.let(::loadInSize)?.let(::blur)?.let(::blur)
+                                ?.let(::blur)?.let(::quality)?.let(::artwork::set)
+                        }.onFailure {
+                            it.printStackTrace()
+                        }
+                    }
                 }
+
+                ContentType.parse(type).match(ContentType.Image.Any) -> {
+                    val bounds = getImageBounds(uri)
+                    ImageAttachment {
+                        contentType = type
+                        this.uri = uriString
+                        uriDetail?.name?.let(this::filename::set)
+                        uriDetail?.size?.let(this::size::set)
+                        width = bounds.outWidth
+                        height = bounds.outHeight
+                        thumb =
+                            uri.let(::loadInSize)?.let(::blur)?.let(::blur)?.let(::blur)
+                                ?.let(::blur)
+                                ?.let(::quality)
+                    }
+                }
+
+                ContentType.parse(type).match(ContentType.Video.Any) -> {
+                    VideoAttachment {
+                        contentType = type
+                        this.uri = uriString
+                        uriDetail?.name?.let(this::filename::set)
+                        uriDetail?.size?.let(this::size::set)
+                        kotlin.runCatching {
+                            val retriever = MediaMetadataRetriever()
+                            retriever.setDataSource(context, uri)
+                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+                                ?.toIntOrNull()?.let(this::width::set)
+                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+                                ?.toIntOrNull()?.let(this::height::set)
+                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                ?.toLongOrNull()?.let(this::duration::set)
+                            this.thumb =
+                                (
+                                    retriever.embeddedPicture
+                                        ?: retriever.frameAtTime
+                                    )?.let(::loadInSize)
+                                    ?.let(::blur)?.let(::blur)?.let(::blur)?.let(::quality)
+                            retriever.release()
+                        }.onFailure {
+                            it.printStackTrace()
+                        }
+                    }
+                }
+
+                else -> {
+                    FileAttachment {
+                        contentType = type
+                        this.uri = uriString
+                        uriDetail?.name?.let(this::filename::set)
+                        uriDetail?.size?.let(this::size::set)
+                    }
+                }
+            }.let { attachment ->
+                _viewState.value.attachments.add(attachment)
             }
-        }.let { attachment ->
-            _viewState.value.attachments.add(attachment)
         }
     }
 
@@ -443,19 +522,19 @@ class MessageViewModel @Inject constructor(
         val options = BitmapFactory.Options().apply {
             inJustDecodeBounds = true
         }
-        application.contentResolver.openInputStream(uri)?.use {
+        context.contentResolver.openInputStream(uri)?.use {
             BitmapFactory.decodeStream(it, null, options)
         }
         return options
     }
 
     private fun loadInSize(data: Any): Bitmap? {
-        val request = ImageRequest.Builder(application)
+        val request = ImageRequest.Builder(context)
             .data(data)
             .size(320, 320)
             .scale(Scale.FIT)
             .build()
-        val result = application.imageLoader.executeBlocking(request)
+        val result = context.imageLoader.executeBlocking(request)
         return when (result) {
             is ErrorResult -> null
             is SuccessResult -> result.image.toBitmap().copy(
@@ -465,12 +544,13 @@ class MessageViewModel @Inject constructor(
         }
     }
 
+    @SuppressLint("NewApi")
     private fun blur(bitmap: Bitmap): Bitmap? {
-        val request = ImageRequest.Builder(application)
+        val request = ImageRequest.Builder(context)
             .data(bitmap)
             .transformations(BlurTransformation(25f, 1f))
             .build()
-        val result = application.imageLoader.executeBlocking(request)
+        val result = context.imageLoader.executeBlocking(request)
         return when (result) {
             is ErrorResult -> null
             is SuccessResult -> result.image.toBitmap().copy(
@@ -491,7 +571,7 @@ class MessageViewModel @Inject constructor(
         }
     }
 
-    fun onAttachmentRemove(attachment: Attachment) {
+    override fun onAttachmentRemove(attachment: Attachment) {
         _viewState.value.attachments.remove(attachment)
     }
 
@@ -555,13 +635,13 @@ class MessageViewModel @Inject constructor(
         _viewState.value.attachments.clear()
     }
 
-    fun onSend(
+    override fun onSend(
         sessionIdRequest: suspend () -> Long?,
         replyRequest: suspend () -> Long?,
         onSuccess: () -> Unit
     ) {
         if (_viewState.value.isProcessing) return
-        viewModelScope.launch {
+        scope.launch {
             changeProcessingState(true)
             val attachments = _viewState.value.attachments
             val reply = replyRequest()
@@ -599,7 +679,7 @@ class MessageViewModel @Inject constructor(
     }
 
     fun sendLocationMessage(sessionIdRequest: suspend () -> Long?, poiItem: PoiItemV2) =
-        viewModelScope.launch {
+        scope.launch {
             val sid = sessionIdRequest() ?: return@launch
             val attachment = LocationAttachment {
                 latitude = poiItem.latLonPoint.latitude
@@ -613,7 +693,7 @@ class MessageViewModel @Inject constructor(
         }
 
     fun sendLocationMessage(sessionIdRequest: suspend () -> Long?, latLng: LatLng) =
-        viewModelScope.launch {
+        scope.launch {
             val sid = sessionIdRequest() ?: return@launch
             val attachment = LocationAttachment {
                 latitude = latLng.latitude
@@ -622,13 +702,15 @@ class MessageViewModel @Inject constructor(
             repository.addMessageRequest(createAttachmentMessage(sid, null, attachment))
         }
 
-    fun sendLocationMessage(
+    override fun sendLocationMessage(
         sessionIdRequest: suspend () -> Long?,
         attachment: LocationAttachment?
-    ) = viewModelScope.launch {
-        val sid = sessionIdRequest() ?: return@launch
-        val attachment = attachment ?: return@launch
-        repository.addMessageRequest(createAttachmentMessage(sid, null, attachment))
+    ) {
+        scope.launch {
+            val sid = sessionIdRequest() ?: return@launch
+            val attachment = attachment ?: return@launch
+            repository.addMessageRequest(createAttachmentMessage(sid, null, attachment))
+        }
     }
 
     override fun onReceiveContent(view: View, payload: ContentInfoCompat): ContentInfoCompat? {
@@ -658,24 +740,3 @@ data class MessageViewState(
     val isEditing: Boolean = false,
     val editMessage: Message? = null
 )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

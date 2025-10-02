@@ -38,9 +38,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,82 +50,35 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
-import androidx.hilt.navigation.compose.hiltViewModel
 import cn.tabidachi.electro.R
-import cn.tabidachi.electro.data.database.entity.User
-import cn.tabidachi.electro.ext.findActivity
+import cn.tabidachi.electro.ui.call.CallContract.Event
+import cn.tabidachi.electro.ui.call.CallContract.State
 import cn.tabidachi.electro.ui.common.VideoRenderer
+import cn.tabidachi.electro.ui.preview.PreviewSurface
+import cn.tabidachi.electro.ui.preview.Previews
 import coil3.compose.AsyncImage
-import org.webrtc.IceCandidate
+import org.webrtc.EglBase
+import org.webrtc.VideoTrack
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun CallScreen(
-    offer: Long,
-    answer: Long,
-    action: String,
-    onCallEnd: () -> Unit = {},
+    state: State,
+    event: (Event) -> Unit,
+    localVideoTrack: VideoTrack?,
+    remoteVideoTrack: VideoTrack?,
+    eglBaseContext: EglBase.Context?
 ) {
-    val context = LocalContext.current
-    val viewModel: CallViewModel = hiltViewModel()
-    val viewState by viewModel.viewState.collectAsState()
-    val localVideoTrack by viewModel.factory.localVideoTrack.collectAsState(null)
-    val remoteVideoTrack by viewModel.factory.remoteVideoTrack.collectAsState(null)
-    LaunchedEffect(Unit) {
-        viewModel.init(offer, answer, action)
-    }
-    LaunchedEffect(key1 = Unit, block = {
-        viewModel.onMicEnabled(viewState.mic)
-        viewModel.onCameraEnabled(viewState.camera)
-        viewModel.isSpeakerphone(viewState.isSpeakerphone)
-    })
-    LaunchedEffect(key1 = Unit, block = {
-        viewModel.onCallEnd.collect {
-            if (it) {
-                viewModel.stop()
-                onCallEnd()
-            }
-        }
-    })
     var parentSize: IntSize by remember { mutableStateOf(IntSize(0, 0)) }
-    val view = LocalView.current
-    DisposableEffect(key1 = Unit, effect = {
-        view.keepScreenOn = true
-        onDispose {
-            view.keepScreenOn = false
-        }
-    })
-    DisposableEffect(Unit) {
-        val window = context.findActivity()?.window ?: return@DisposableEffect onDispose { }
-        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-        insetsController.apply {
-            hide(WindowInsetsCompat.Type.statusBars())
-            hide(WindowInsetsCompat.Type.navigationBars())
-            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
-        onDispose {
-            insetsController.apply {
-                show(WindowInsetsCompat.Type.statusBars())
-                show(WindowInsetsCompat.Type.navigationBars())
-                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
-            }
-        }
-    }
-
     Box(
         modifier = Modifier
     ) {
         AsyncImage(
-            model = viewState.user?.avatar,
+            model = state.user?.avatar,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
@@ -138,14 +88,12 @@ fun CallScreen(
                 .fillMaxWidth()
                 .combinedClickable(
                     onClick = {
-                        viewModel.changeVisible()
-                    }, onLongClick = {
-
-                    }, onDoubleClick = {
-
-                    }, interactionSource = remember {
+                        event(Event.ToggleImmersive)
+                    },
+                    interactionSource = remember {
                         MutableInteractionSource()
-                    }, indication = null
+                    },
+                    indication = null
                 )
         ) {
             Box(
@@ -155,15 +103,17 @@ fun CallScreen(
                         parentSize = it
                     }
             ) {
-                remoteVideoTrack?.let {
-                    VideoRenderer(
-                        videoTrack = it,
-                        modifier = Modifier.fillMaxSize(),
-                        eglBaseContext = viewModel.factory.eglBaseContext
-                    )
+                remoteVideoTrack?.let { videoTrack ->
+                    eglBaseContext?.let { eglBaseContext ->
+                        VideoRenderer(
+                            videoTrack = videoTrack,
+                            modifier = Modifier.fillMaxSize(),
+                            eglBaseContext = eglBaseContext
+                        )
+                    }
                 }
             }
-            if (localVideoTrack != null && viewState.camera) {
+            if (localVideoTrack != null && eglBaseContext != null && state.camera) {
                 FloatingVideoRenderer(
                     videoTrack = localVideoTrack!!,
                     parentBounds = parentSize,
@@ -172,28 +122,30 @@ fun CallScreen(
                         .size(width = 150.dp, height = 210.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .align(Alignment.TopEnd),
-                    eglBaseContext = viewModel.factory.eglBaseContext
+                    eglBaseContext = eglBaseContext
                 )
             }
         }
         AnimatedVisibility(
-            visible = viewState.barsVisible,
+            visible = state.barsVisible,
             modifier = Modifier.align(Alignment.TopCenter)
         ) {
             TopAppBar(
                 title = {
-
-                }, navigationIcon = {
+                },
+                navigationIcon = {
                     IconButton(onClick = {
-                        viewModel.onCallEnd(onCallEnd)
+                        event(Event.OnCallEnd)
                     }) {
                         Icon(imageVector = Icons.Rounded.ArrowBack, contentDescription = null)
                     }
-                }, actions = {
-                    IconButton(onClick = viewModel::flipCamera) {
+                },
+                actions = {
+                    IconButton(onClick = { event(Event.FlipCamera) }) {
                         Icon(imageVector = Icons.Rounded.Cameraswitch, contentDescription = null)
                     }
-                }, colors = topAppBarColors(containerColor = Color.Transparent),
+                },
+                colors = topAppBarColors(containerColor = Color.Transparent),
                 modifier = Modifier
                     .background(
                         Brush.verticalGradient(
@@ -208,7 +160,7 @@ fun CallScreen(
             )
         }
         AnimatedVisibility(
-            visible = viewState.barsVisible,
+            visible = state.barsVisible,
             modifier = Modifier.align(Alignment.BottomCenter),
             enter = fadeIn(),
             exit = fadeOut(),
@@ -230,7 +182,7 @@ fun CallScreen(
                     )
                     .navigationBarsPadding()
             ) {
-                CallAction.values().forEach {
+                CallAction.entries.forEach {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
@@ -240,8 +192,9 @@ fun CallScreen(
                             CallAction.CallEnd -> {
                                 FilledIconButton(
                                     onClick = {
-                                        viewModel.onCallEnd(onCallEnd)
-                                    }, modifier = Modifier.size(48.dp),
+                                        event(Event.OnCallEnd)
+                                    },
+                                    modifier = Modifier.size(48.dp),
                                     colors = IconButtonDefaults.filledIconButtonColors(
                                         containerColor = MaterialTheme.colorScheme.error
                                     )
@@ -252,12 +205,14 @@ fun CallScreen(
 
                             CallAction.Mic -> {
                                 FilledIconToggleButton(
-                                    checked = viewState.mic,
-                                    onCheckedChange = viewModel::onMicEnabled,
+                                    checked = state.mic,
+                                    onCheckedChange = {
+                                        event(Event.OnMicEnabled(it))
+                                    },
                                     modifier = Modifier.size(48.dp)
                                 ) {
                                     Icon(
-                                        imageVector = if (viewState.mic) it.active else it.inactive,
+                                        imageVector = if (state.mic) it.active else it.inactive,
                                         contentDescription = null
                                     )
                                 }
@@ -265,13 +220,14 @@ fun CallScreen(
 
                             CallAction.Camera -> {
                                 FilledIconToggleButton(
-                                    checked = viewState.camera,
+                                    checked = state.camera,
                                     onCheckedChange = {
-                                        viewModel.onCameraEnabled(it)
-                                    }, modifier = Modifier.size(48.dp)
+                                        event(Event.OnCameraEnabled(it))
+                                    },
+                                    modifier = Modifier.size(48.dp)
                                 ) {
                                     Icon(
-                                        imageVector = if (viewState.camera) it.active else it.inactive,
+                                        imageVector = if (state.camera) it.active else it.inactive,
                                         contentDescription = null
                                     )
                                 }
@@ -279,13 +235,14 @@ fun CallScreen(
 
                             CallAction.Speakerphone -> {
                                 FilledIconToggleButton(
-                                    checked = viewState.isSpeakerphone,
+                                    checked = state.isSpeakerphone,
                                     onCheckedChange = {
-                                        viewModel.isSpeakerphone(it)
-                                    }, modifier = Modifier.size(48.dp)
+                                        event(Event.IsSpeakerphone(it))
+                                    },
+                                    modifier = Modifier.size(48.dp)
                                 ) {
                                     Icon(
-                                        imageVector = if (viewState.isSpeakerphone) it.active else it.inactive,
+                                        imageVector = if (state.isSpeakerphone) it.active else it.inactive,
                                         contentDescription = null
                                     )
                                 }
@@ -295,12 +252,27 @@ fun CallScreen(
                             text = stringResource(id = it.text),
                             style = MaterialTheme.typography.labelSmall,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
             }
         }
+    }
+}
+
+@Previews
+@Composable
+private fun CallScreenPreview() {
+    PreviewSurface {
+        CallScreen(
+            state = State(),
+            event = {},
+            localVideoTrack = null,
+            remoteVideoTrack = null,
+            eglBaseContext = null,
+        )
     }
 }
 
@@ -314,15 +286,3 @@ enum class CallAction(
     Camera(Icons.Rounded.Videocam, Icons.Rounded.VideocamOff, R.string.camera),
     CallEnd(Icons.Rounded.CallEnd, Icons.Rounded.CallEnd, R.string.call_end),
 }
-
-fun RemoteIceCandidate.toLocal() = IceCandidate(this.sdpMid, this.sdpMLineIndex, this.sdp)
-
-data class CallViewState(
-    val mic: Boolean = true,
-    val camera: Boolean = true,
-    val isSpeakerphone: Boolean = false,
-    val isFrontCamera: Boolean = true,
-    val target: Long? = null,
-    val user: User? = null,
-    val barsVisible: Boolean = true
-)

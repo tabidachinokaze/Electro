@@ -13,7 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,39 +27,84 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.composable
 import cn.tabidachi.electro.R
 import cn.tabidachi.electro.ext.regex
-import cn.tabidachi.electro.ui.ElectroNavigationActions
+import cn.tabidachi.electro.model.EmptyMessenger
+import cn.tabidachi.electro.model.Messenger
 import cn.tabidachi.electro.ui.common.SimpleTextField
+import cn.tabidachi.electro.ui.group.GroupContract.Event
+import cn.tabidachi.electro.ui.group.GroupContract.State
+import cn.tabidachi.electro.ui.pair.navigateToPair
+import cn.tabidachi.electro.ui.preview.PreviewSurface
+import cn.tabidachi.electro.ui.preview.Previews
 import coil3.compose.AsyncImage
+import kotlinx.serialization.Serializable
+import moe.tabidachi.compose.mvi.observe
+
+@Serializable
+data object GroupInviteRoute
+
+context(navController: NavHostController)
+fun NavGraphBuilder.groupInvite() = composable<GroupInviteRoute> {
+    val viewModel: GroupViewModel =
+        hiltViewModel(navController.getBackStackEntry(GroupRoute::class))
+    val (state, event) = viewModel.observe {
+        when (it) {
+            GroupContract.Effect.NavigateUp -> navController.navigateUp()
+        }
+    }
+    GroupInviteScreen(
+        state = state.value,
+        event = {
+            when (it) {
+                is Event.NavigateToChannelAdmin -> navController.navigateToGroupAdmin()
+                is Event.NavigateToChannelDetail -> navController.navigateToGroupDetail()
+                is Event.NavigateToChannelEdit -> navController.navigateToGroupEdit()
+                is Event.NavigateToChannelInvite -> navController.navigateToGroupInvite()
+                is Event.NavigateToPair -> navController.navigateToPair(it.uid)
+                Event.NavigateUp -> navController.navigateUp()
+                else -> event(it)
+            }
+        },
+        messenger = viewModel.messenger
+    )
+}
+
+fun NavHostController.navigateToGroupInvite() {
+    navigate(GroupInviteRoute)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InviteScreen(
-    sid: Long,
-    navigationActions: ElectroNavigationActions,
-    viewModel: GroupViewModel = hiltViewModel()
+fun GroupInviteScreen(
+    state: State,
+    event: (Event) -> Unit,
+    messenger: Messenger
 ) {
-    val viewState by viewModel.viewState.collectAsState()
-    LaunchedEffect(key1 = sid, block = {
-        viewModel.setSessionId(sid)
-        viewModel.getContact()
-    })
+    LaunchedEffect(Unit) {
+        event(Event.GetContact)
+    }
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(text = stringResource(id = R.string.add_members))
                 }, navigationIcon = {
-                    IconButton(onClick = navigationActions::navigateUp) {
-                        Icon(imageVector = Icons.Rounded.ArrowBack, contentDescription = null)
+                    IconButton(
+                        onClick = { event(Event.NavigateUp) }
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = null
+                        )
                     }
                 }
             )
@@ -71,9 +116,9 @@ fun InviteScreen(
                 .imePadding()
         ) {
             SimpleTextField(
-                value = viewState.filter,
+                value = state.filter,
                 onValueChange = {
-                    viewModel.onFilterChange(it)
+                    event(Event.OnFilterChange(it))
                 }, placeholder = {
                     Text(text = stringResource(id = R.string.search_contacts))
                 }, maxLines = 1,
@@ -85,16 +130,19 @@ fun InviteScreen(
                 modifier = Modifier.weight(1f)
             ) {
                 items(
-                    viewState.contacts.filter {
-                        viewState.filter.regex().matches(it.username)
+                    state.contacts.filter {
+                        state.filter.regex().matches(it.username)
                     }
                 ) { user ->
                     ListItem(
                         headlineContent = {
                             Text(text = user.username)
                         }, supportingContent = {
-                            if (viewModel.online(user.uid)) {
-                                Text(text = stringResource(id = R.string.online), color = MaterialTheme.colorScheme.primary)
+                            if (messenger.online(user.uid)) {
+                                Text(
+                                    text = stringResource(id = R.string.online),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
                             } else {
                                 Text(text = stringResource(id = R.string.offline))
                             }
@@ -108,14 +156,14 @@ fun InviteScreen(
                                     contentDescription = null,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.clickable {
-                                        navigationActions.navigateToPair(user.uid)
+                                        event(Event.NavigateToPair(user.uid))
                                     }
                                 )
                             }
                         }, trailingContent = {
-                            AnimatedVisibility(visible = !viewState.users.any { user.uid == it.uid }) {
+                            AnimatedVisibility(visible = !state.users.any { user.uid == it.uid }) {
                                 Button(onClick = {
-                                    viewModel.invite(user.uid)
+                                    event(Event.Invite(user.uid))
                                 }) {
                                     Text(text = stringResource(id = R.string.invite))
                                 }
@@ -123,7 +171,7 @@ fun InviteScreen(
                         }, modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                navigationActions.navigateToPair(user.uid)
+                                event(Event.NavigateToPair(user.uid))
                             }
                     )
                 }
@@ -132,5 +180,17 @@ fun InviteScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+@Previews
+private fun GroupInviteScreenPreview() {
+    PreviewSurface {
+        GroupInviteScreen(
+            state = State(),
+            event = {},
+            messenger = EmptyMessenger
+        )
     }
 }
