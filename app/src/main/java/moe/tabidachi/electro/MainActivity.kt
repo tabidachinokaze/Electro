@@ -11,14 +11,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
-import moe.tabidachi.electro.ext.toast
-import moe.tabidachi.electro.ui.ElectroNavGraph
-import moe.tabidachi.electro.ui.common.ReleaseDialog
-import moe.tabidachi.electro.ui.theme.ElectroTheme
 import com.microsoft.appcenter.distribute.Distribute
 import com.microsoft.appcenter.distribute.DistributeListener
 import com.microsoft.appcenter.distribute.ReleaseDetails
 import dagger.hilt.android.AndroidEntryPoint
+import moe.tabidachi.compose.mvi.observe
+import moe.tabidachi.electro.ext.toast
+import moe.tabidachi.electro.ui.ElectroNavGraph
+import moe.tabidachi.electro.ui.common.ReleaseDialog
+import moe.tabidachi.electro.ui.theme.ElectroTheme
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity(), DistributeListener {
@@ -33,21 +34,23 @@ class MainActivity : ComponentActivity(), DistributeListener {
         setContentView(
             ElectroComposeView(this).apply {
                 setContent {
+                    val (state, _) = electroViewModel.observe { }
                     ElectroTheme(
-                        darkLight = electroViewModel.darkLight,
-                        theme = electroViewModel.theme
+                        darkLight = state.value.darkLight,
+                        theme = state.value.theme
                     ) {
                         // A surface container using the 'background' color from the theme
                         Surface(
                             modifier = Modifier.fillMaxSize(),
                         ) {
-                            ElectroNavGraph()
+                            ElectroNavGraph(startDestination = state.value.startDestination)
                         }
                         ReleaseDialog(
                             visible = updateDialogVisible,
                             onDismissRequest = {
                                 updateDialogVisible = false
-                            }, releaseDetails = releaseDetails
+                            },
+                            releaseDetails = releaseDetails
                         )
                     }
                 }

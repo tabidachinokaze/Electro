@@ -10,6 +10,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
 import dagger.hilt.android.AndroidEntryPoint
+import moe.tabidachi.compose.mvi.observe
 import moe.tabidachi.electro.model.attachment.LocationAttachment
 import moe.tabidachi.electro.ui.map.DragDropSelectPointScreen
 import moe.tabidachi.electro.ui.theme.ElectroTheme
@@ -21,9 +22,10 @@ class LocationActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
+            val (state, _) = electroViewModel.observe { }
             ElectroTheme(
-                darkLight = electroViewModel.darkLight,
-                theme = electroViewModel.theme
+                darkLight = state.value.darkLight,
+                theme = state.value.theme
             ) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     DragDropSelectPointScreen(

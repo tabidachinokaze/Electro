@@ -6,17 +6,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.viewModelScope
-import moe.tabidachi.electro.PreferenceConstant
-import moe.tabidachi.electro.data.Repository
-import moe.tabidachi.electro.data.network.Ktor
-import moe.tabidachi.electro.data.network.MinIO
-import moe.tabidachi.electro.ext.MINIO
-import moe.tabidachi.electro.ext.dataStore
-import moe.tabidachi.electro.model.request.UserUpdateRequest
-import moe.tabidachi.electro.ui.settings.SettingsContract.Event
-import moe.tabidachi.electro.ui.settings.SettingsContract.State
-import moe.tabidachi.electro.ui.theme.DarkLight
-import moe.tabidachi.electro.ui.theme.Theme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -33,6 +22,17 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import moe.tabidachi.electro.Prefs
+import moe.tabidachi.electro.data.Repository
+import moe.tabidachi.electro.data.network.Ktor
+import moe.tabidachi.electro.data.network.MinIO
+import moe.tabidachi.electro.ext.MINIO
+import moe.tabidachi.electro.ext.dataStore
+import moe.tabidachi.electro.model.request.UserUpdateRequest
+import moe.tabidachi.electro.ui.settings.SettingsContract.Event
+import moe.tabidachi.electro.ui.settings.SettingsContract.State
+import moe.tabidachi.electro.ui.theme.DarkLight
+import moe.tabidachi.electro.ui.theme.Theme
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 
@@ -61,14 +61,14 @@ class SettingsViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             application.dataStore.data.map {
-                it[PreferenceConstant.Key.DARK_LIGHT]
+                it[Prefs.DARK_LIGHT]
             }.filterNotNull().collect { value ->
                 updateState { it.copy(darkLight = DarkLight.valueOf(value)) }
             }
         }
         viewModelScope.launch {
             application.dataStore.data.map {
-                it[PreferenceConstant.Key.THEME]
+                it[Prefs.THEME]
             }.filterNotNull().filter { it.isNotBlank() }.collect { value ->
                 updateState { it.copy(theme = Theme.valueOf(value)) }
             }
@@ -148,8 +148,8 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             repository.removeAccount(ktor.uid)
             application.dataStore.edit {
-                it[PreferenceConstant.Key.THEME] = ""
-                it[PreferenceConstant.Key.UID] = 0
+                it[Prefs.THEME] = ""
+                it[Prefs.UID] = 0
             }
         }
     }
@@ -157,7 +157,7 @@ class SettingsViewModel @Inject constructor(
     private fun onDayNightModeChange(darkLight: DarkLight) {
         viewModelScope.launch {
             application.dataStore.edit {
-                it[PreferenceConstant.Key.DARK_LIGHT] = darkLight.name
+                it[Prefs.DARK_LIGHT] = darkLight.name
             }
         }
     }
@@ -169,7 +169,7 @@ class SettingsViewModel @Inject constructor(
     private fun onThemeChange(theme: Theme) {
         viewModelScope.launch {
             application.dataStore.edit {
-                it[PreferenceConstant.Key.THEME] = theme.name
+                it[Prefs.THEME] = theme.name
             }
         }
     }

@@ -5,7 +5,15 @@ import android.util.Log
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.viewModelScope
-import moe.tabidachi.electro.PreferenceConstant
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.ktor.http.HttpStatusCode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import moe.tabidachi.compose.mvi.BaseViewModel
+import moe.tabidachi.electro.Prefs
 import moe.tabidachi.electro.R
 import moe.tabidachi.electro.data.database.ElectroDatabase
 import moe.tabidachi.electro.data.database.entity.Account
@@ -20,14 +28,6 @@ import moe.tabidachi.electro.model.request.RegisterRequest
 import moe.tabidachi.electro.ui.auth.AuthContract.Effect
 import moe.tabidachi.electro.ui.auth.AuthContract.Event
 import moe.tabidachi.electro.ui.auth.AuthContract.State
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
-import io.ktor.http.HttpStatusCode
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import moe.tabidachi.compose.mvi.BaseViewModel
 import javax.inject.Inject
 
 @HiltViewModel
@@ -202,8 +202,8 @@ class AuthViewModel @Inject constructor(
 
                     else -> {
                         context.dataStore.edit {
-                            it[PreferenceConstant.Key.TOKEN] = data.token
-                            it[PreferenceConstant.Key.UID] = data.uid
+                            it[Prefs.TOKEN] = data.token
+                            it[Prefs.UID] = data.uid
                         }
                         withContext(Dispatchers.IO) {
                             database.accountDao().upsert(Account(data.uid, data.token))

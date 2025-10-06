@@ -2,11 +2,20 @@ package moe.tabidachi.electro
 
 import android.app.Application
 import android.util.Log
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.messaging.FirebaseMessaging
+import dagger.hilt.android.lifecycle.HiltViewModel
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import moe.tabidachi.compose.mvi.BaseViewModel
+import moe.tabidachi.electro.ElectroContract.State
 import moe.tabidachi.electro.data.Repository
 import moe.tabidachi.electro.data.network.Ktor
 import moe.tabidachi.electro.ext.dataStore
@@ -16,53 +25,35 @@ import moe.tabidachi.electro.ui.sessions.SessionsRoute
 import moe.tabidachi.electro.ui.splash.SplashRoute
 import moe.tabidachi.electro.ui.theme.DarkLight
 import moe.tabidachi.electro.ui.theme.Theme
-import com.google.firebase.messaging.FirebaseMessaging
-import dagger.hilt.android.lifecycle.HiltViewModel
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class ElectroViewModel @Inject constructor(
     private val application: Application,
     val ktor: Ktor,
-    private val repository: Repository,
-) : ViewModel() {
-    private val _viewState = MutableStateFlow(ElectroViewState())
-    val viewState = _viewState.asStateFlow()
-    var darkLight by mutableStateOf(DarkLight.SYSTEM)
-    var theme: Theme by mutableStateOf(Theme.Dynamic)
-
+    private val repository: Repository
+) : ElectroContract.ViewModel(State()) {
     init {
         val account = application.dataStore.data.map {
-            it[PreferenceConstant.Key.TOKEN] to (it[PreferenceConstant.Key.UID] ?: 0)
+            it[Prefs.TOKEN] to (it[Prefs.UID] ?: 0)
         }
         viewModelScope.launch {
             account.collectLatest { (token: String?, uid: Long) ->
                 if (token.isNullOrBlank() || uid == 0L) {
-                    _viewState.update { it.copy(startDestination = AuthRoute) }
+                    updateState { it.copy(startDestination = AuthRoute) }
                     ktor.ws.pause()
                     ktor.ws.close()
                 } else {
                     if (ktor.token != token && ktor.uid != uid) {
                         ktor.ws.close()
-                        _viewState.update { it.copy(startDestination = SplashRoute) }
+                        updateState { it.copy(startDestination = SplashRoute) }
                     }
                     ktor.token = token
                     ktor.uid = uid
 
                     FirebaseMessaging.getInstance().token.addOnCompleteListener {
                         viewModelScope.launch {
-                            kotlin.runCatching {
+                            runCatching {
                                 ktor.client.post("/firebase") {
                                     setBody(it.result)
                                 }
@@ -76,27 +67,29 @@ class ElectroViewModel @Inject constructor(
                     }
                     ktor.ws.resume()
                     delay(200)
-                    _viewState.update { it.copy(startDestination = SessionsRoute) }
+                    updateState { it.copy(startDestination = SessionsRoute) }
                 }
             }
         }
         viewModelScope.launch {
             application.dataStore.data.map {
-                it[PreferenceConstant.Key.DARK_LIGHT]
-            }.filterNotNull().collect {
-                darkLight = DarkLight.valueOf(it)
+                it[Prefs.DARK_LIGHT]
+            }.filterNotNull().collect { darkLight ->
+                updateState { it.copy(darkLight = DarkLight.valueOf(darkLight)) }
             }
         }
         viewModelScope.launch {
             application.dataStore.data.map {
-                it[PreferenceConstant.Key.THEME]
-            }.filterNotNull().filter { it.isNotBlank() }.collect {
-                theme = Theme.valueOf(it)
+                it[Prefs.THEME]
+            }.filterNotNull().filter { it.isNotBlank() }.collect { theme ->
+                updateState { it.copy(theme = Theme.valueOf(theme)) }
             }
         }
     }
 
     val map = HashMap<String, DownloadState>()
+
+    override fun event(event: ElectroContract.Event) {}
 
     fun download(id: String, url: String): DownloadState {
         val state = DownloadState()
@@ -120,8 +113,18 @@ class ElectroViewModel @Inject constructor(
     }
 }
 
-data class ElectroViewState(
-    val token: String? = null,
-    val isReady: Boolean = false,
-    val startDestination: Any = SplashRoute
-)
+interface ElectroContract {
+    abstract class ViewModel(initialState: State) :
+        BaseViewModel<State, Event, Effect>(initialState)
+
+    data class State(
+        val token: String? = null,
+        val startDestination: Any = SplashRoute,
+        val darkLight: DarkLight = DarkLight.SYSTEM,
+        val theme: Theme = Theme.Dynamic
+    )
+
+    sealed interface Event
+
+    sealed interface Effect
+}

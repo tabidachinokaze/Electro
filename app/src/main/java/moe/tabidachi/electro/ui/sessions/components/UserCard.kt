@@ -39,14 +39,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.edit
-import moe.tabidachi.electro.PreferenceConstant
-import moe.tabidachi.electro.data.database.entity.User
-import moe.tabidachi.electro.ext.dataStore
-import moe.tabidachi.electro.ui.theme.DarkLight
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import moe.tabidachi.electro.Prefs
+import moe.tabidachi.electro.data.database.entity.User
+import moe.tabidachi.electro.ext.dataStore
+import moe.tabidachi.electro.ui.theme.DarkLight
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
@@ -63,7 +63,7 @@ fun UserCard(
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         context.dataStore.data.map {
-            it[PreferenceConstant.Key.DARK_LIGHT]
+            it[Prefs.DARK_LIGHT]
         }.filterNotNull().collect {
             darkLight = DarkLight.valueOf(it)
         }
@@ -89,9 +89,11 @@ fun UserCard(
                 }
                 CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
                     AnimatedContent(
-                        targetState = darkLight, modifier = Modifier
+                        targetState = darkLight,
+                        modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(8.dp), label = ""
+                            .padding(8.dp),
+                        label = ""
                     ) {
                         val isNight = when (it) {
                             DarkLight.SYSTEM -> isSystemInDarkTheme()
@@ -101,7 +103,7 @@ fun UserCard(
                         IconButton(onClick = {
                             scope.launch {
                                 context.dataStore.edit {
-                                    it[PreferenceConstant.Key.DARK_LIGHT] =
+                                    it[Prefs.DARK_LIGHT] =
                                         if (isNight) DarkLight.LIGHT.name else DarkLight.DARK.name
                                 }
                             }
@@ -121,7 +123,8 @@ fun UserCard(
                     .clickable(
                         interactionSource = remember {
                             MutableInteractionSource()
-                        }, indication = null,
+                        },
+                        indication = null,
                         onClick = onExpand
                     )
             ) {
@@ -135,7 +138,9 @@ fun UserCard(
                     )
                     Text(
                         text = user.email,
-                        style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
                         maxLines = 1
                     )
                 }

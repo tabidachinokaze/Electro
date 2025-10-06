@@ -5,21 +5,17 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
-import moe.tabidachi.electro.ElectroViewModel
 import moe.tabidachi.electro.ui.auth.auth
-import moe.tabidachi.electro.ui.channel.channelAdmin
 import moe.tabidachi.electro.ui.channel.channel
+import moe.tabidachi.electro.ui.channel.channelAdmin
+import moe.tabidachi.electro.ui.channel.channelCreate
 import moe.tabidachi.electro.ui.channel.channelDetail
 import moe.tabidachi.electro.ui.channel.channelEdit
 import moe.tabidachi.electro.ui.channel.channelInvite
-import moe.tabidachi.electro.ui.channel.channelCreate
 import moe.tabidachi.electro.ui.contact.contact
 import moe.tabidachi.electro.ui.group.group
 import moe.tabidachi.electro.ui.group.groupAdmin
@@ -39,12 +35,11 @@ import moe.tabidachi.electro.ui.splash.splash
 fun ElectroNavGraph(
     modifier: Modifier = Modifier,
     navHostController: NavHostController = rememberNavController(),
+    startDestination: Any
 ) = with(navHostController) {
-    val electroViewModel: ElectroViewModel = hiltViewModel()
-    val viewState by electroViewModel.viewState.collectAsState()
     NavHost(
         navController = navHostController,
-        startDestination = viewState.startDestination,
+        startDestination = startDestination,
         modifier = modifier,
         enterTransition = {
             fadeIn(animationSpec = tween(220, delayMillis = 90)) +

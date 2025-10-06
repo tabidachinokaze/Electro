@@ -3,7 +3,13 @@ package moe.tabidachi.electro.ui.sessions
 import android.app.Application
 import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.viewModelScope
-import moe.tabidachi.electro.PreferenceConstant
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import moe.tabidachi.electro.Prefs
 import moe.tabidachi.electro.data.Repository
 import moe.tabidachi.electro.data.database.entity.Path
 import moe.tabidachi.electro.data.network.Ktor
@@ -11,12 +17,6 @@ import moe.tabidachi.electro.data.network.MessageType
 import moe.tabidachi.electro.ext.dataStore
 import moe.tabidachi.electro.ui.sessions.SessionsContract.Event
 import moe.tabidachi.electro.ui.sessions.SessionsContract.State
-import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
 import javax.inject.Inject
 
 @HiltViewModel
@@ -115,8 +115,8 @@ class SessionsViewModel @Inject constructor(
             repository.findAccount(uid)?.let { account ->
                 val token = account.token ?: return@launch
                 application.dataStore.edit {
-                    it[PreferenceConstant.Key.TOKEN] = token
-                    it[PreferenceConstant.Key.UID] = account.uid
+                    it[Prefs.TOKEN] = token
+                    it[Prefs.UID] = account.uid
                 }
             }
         }
