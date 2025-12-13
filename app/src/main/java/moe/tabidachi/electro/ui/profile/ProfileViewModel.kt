@@ -1,20 +1,22 @@
 package moe.tabidachi.electro.ui.profile
 
 import androidx.lifecycle.viewModelScope
-import moe.tabidachi.electro.data.Repository
-import moe.tabidachi.electro.data.network.Ktor
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.launch
+import moe.tabidachi.electro.data.ElectroRepository
+import moe.tabidachi.electro.data.provider.UidProvider
+import moe.tabidachi.electro.data.service.UserApi
 import moe.tabidachi.electro.model.request.UserUpdateRequest
 import moe.tabidachi.electro.ui.profile.ProfileContract.Effect
 import moe.tabidachi.electro.ui.profile.ProfileContract.Event
 import moe.tabidachi.electro.ui.profile.ProfileContract.State
-import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
-    private val repository: Repository,
-    private val ktor: Ktor
+    private val electroRepository: ElectroRepository,
+    private val userApi: UserApi,
+    private val uidProvider: UidProvider
 ) : ProfileContract.ViewModel(State()) {
     override fun event(event: Event) {
         when (event) {
@@ -30,7 +32,7 @@ class ProfileViewModel @Inject constructor(
 
     fun getUser() {
         viewModelScope.launch {
-            repository.getUser(ktor.uid).onSuccess {
+            electroRepository.getUser(uidProvider.getUid()).onSuccess {
                 it.data?.let { user ->
                     updateState {
                         it.copy(
@@ -70,8 +72,9 @@ class ProfileViewModel @Inject constructor(
                 val username = if (username == user.username) null else username
                 val password = password.ifBlank { null }
                 val email = if (email == user.email) null else email
-                val result =
-                    repository.updateUserInfo(UserUpdateRequest(username, password, email, null))
+                val result = runCatching {
+                    userApi.userUpdate(UserUpdateRequest(username, password, email, null))
+                }.getOrNull()?.data != null
                 if (result) {
                     emitEffect(Effect.NavigateUp)
                 }

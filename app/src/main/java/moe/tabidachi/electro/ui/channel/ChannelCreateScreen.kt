@@ -49,10 +49,30 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
+import com.mr0xf00.easycrop.CropResult
+import com.mr0xf00.easycrop.crop
+import com.mr0xf00.easycrop.rememberImageCropper
+import com.mr0xf00.easycrop.ui.ImageCropperDialog
+import dagger.hilt.android.lifecycle.HiltViewModel
+import io.ktor.client.HttpClient
+import io.ktor.client.request.put
+import io.ktor.client.request.setBody
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.URLBuilder
+import io.ktor.http.URLProtocol
+import io.ktor.http.Url
+import io.ktor.util.generateNonce
+import io.minio.http.Method
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import moe.tabidachi.compose.mvi.BaseViewModel
+import moe.tabidachi.compose.mvi.observe
 import moe.tabidachi.electro.R
 import moe.tabidachi.electro.data.database.entity.SessionType
-import moe.tabidachi.electro.data.network.Ktor
 import moe.tabidachi.electro.data.network.MinIO
+import moe.tabidachi.electro.data.service.SessionApi
 import moe.tabidachi.electro.ext.MINIO
 import moe.tabidachi.electro.model.request.SessionCreateRequest
 import moe.tabidachi.electro.ui.channel.CreateChannelContract.Effect
@@ -61,26 +81,6 @@ import moe.tabidachi.electro.ui.channel.CreateChannelContract.State
 import moe.tabidachi.electro.ui.common.SimpleTextField
 import moe.tabidachi.electro.ui.preview.PreviewSurface
 import moe.tabidachi.electro.ui.preview.Previews
-import com.mr0xf00.easycrop.CropResult
-import com.mr0xf00.easycrop.crop
-import com.mr0xf00.easycrop.rememberImageCropper
-import com.mr0xf00.easycrop.ui.ImageCropperDialog
-import dagger.hilt.android.lifecycle.HiltViewModel
-import io.ktor.client.request.put
-import io.ktor.client.request.setBody
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.URLBuilder
-import io.ktor.http.URLProtocol
-import io.ktor.http.Url
-import io.ktor.util.generateNonce
-import io.minio.GetPresignedObjectUrlArgs
-import io.minio.http.Method
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
-import moe.tabidachi.compose.mvi.BaseViewModel
-import moe.tabidachi.compose.mvi.observe
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 
@@ -257,8 +257,9 @@ private fun ChannelCreateScreenPreview() {
 
 @HiltViewModel
 class ChannelCreateViewModel @Inject constructor(
-    private val ktor: Ktor,
-    private val minio: MinIO
+    private val client: HttpClient,
+    private val minio: MinIO,
+    private val sessionApi: SessionApi
 ) : CreateChannelContract.ViewModel(State()) {
     override fun event(event: Event) = when (event) {
         is Event.OnDescriptionChange -> onDescriptionChange(event.value)
@@ -290,7 +291,7 @@ class ChannelCreateViewModel @Inject constructor(
                 description = description,
                 image = url
             )
-            ktor.createSession(request).onSuccess {
+            runCatching { sessionApi.createSession(request) }.onSuccess {
                 it.data?.let {
                     emitEffect(Effect.NavigateUpAndNavigateToChannel(it))
                 }
@@ -302,21 +303,15 @@ class ChannelCreateViewModel @Inject constructor(
     }
 
     private suspend fun uploadImage(bitmap: Bitmap): String? {
-        minio.checkOrCreateBucket(MinIO.Companion.AVATAR)
+        minio.checkOrCreateBucket(MinIO.AVATAR)
         val filename = generateNonce()
-        val url = minio.client.getPresignedObjectUrl(
-            GetPresignedObjectUrlArgs.builder()
-                .method(Method.PUT)
-                .bucket(MinIO.Companion.AVATAR)
-                .`object`(filename)
-                .build()
-        )
+        val url = minio.getPresignedObjectUrl(Method.PUT, MinIO.AVATAR, filename)!!
         return withContext(Dispatchers.IO) {
             ByteArrayOutputStream().use { outputStream ->
                 if (
                     runCatching {
                         bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
-                        ktor.upload.put(url) {
+                        client.put(url) {
                             setBody(outputStream.toByteArray())
                         }
                     }.getOrNull()?.status == HttpStatusCode.Companion.OK

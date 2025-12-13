@@ -71,8 +71,8 @@ android {
             )
             buildConfigField(
                 "String",
-                "ELECTRO_SERVER_HOST",
-                properties.getProperty("electro.server.host.release")
+                "ELECTRO_SERVER_URL",
+                properties.getProperty("electro.server.url.release")
             )
             buildConfigField("String", "MINIO_URL", properties.getProperty("minio.url.release"))
             buildConfigField(
@@ -99,8 +99,8 @@ android {
             )
             buildConfigField(
                 "String",
-                "ELECTRO_SERVER_HOST",
-                properties.getProperty("electro.server.host.debug")
+                "ELECTRO_SERVER_URL",
+                properties.getProperty("electro.server.url.debug")
             )
             buildConfigField("String", "MINIO_URL", properties.getProperty("minio.url.debug"))
             buildConfigField(

@@ -10,10 +10,11 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import moe.tabidachi.electro.Prefs
-import moe.tabidachi.electro.data.Repository
+import moe.tabidachi.electro.data.ElectroRepository
 import moe.tabidachi.electro.data.database.entity.Path
-import moe.tabidachi.electro.data.network.Ktor
+import moe.tabidachi.electro.data.network.ElectroWebSocket
 import moe.tabidachi.electro.data.network.MessageType
+import moe.tabidachi.electro.data.provider.UidProvider
 import moe.tabidachi.electro.ext.dataStore
 import moe.tabidachi.electro.ui.sessions.SessionsContract.Event
 import moe.tabidachi.electro.ui.sessions.SessionsContract.State
@@ -21,16 +22,17 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SessionsViewModel @Inject constructor(
-    private val ktor: Ktor,
-    val repository: Repository,
-    private val application: Application
+    val electroRepository: ElectroRepository,
+    private val application: Application,
+    private val webSocket: ElectroWebSocket,
+    private val uidProvider: UidProvider
 ) : SessionsContract.ViewModel(State()) {
     init {
         viewModelScope.launch {
-            repository.pullDialogs()
+            electroRepository.pullDialogs()
         }
         viewModelScope.launch {
-            ktor.ws.onWebSocketMessage.collectLatest { message ->
+            webSocket.onWebSocketMessage.collectLatest { message ->
                 when (message.header.type) {
                     MessageType.Dialog.New.toString() -> {
                         String(message.body).toLong().let(::pullDialog)
@@ -44,10 +46,10 @@ class SessionsViewModel @Inject constructor(
                 }
             }
         }
-        repository.dialogsFlow().onEach { dialogs ->
+        electroRepository.dialogsFlow().onEach { dialogs ->
             updateState { it.copy(dialogs = dialogs) }
         }.launchIn(viewModelScope)
-        repository.sessionsFlow().onEach { sessions ->
+        electroRepository.sessionsFlow().onEach { sessions ->
             updateState { it.copy(sessions = sessions) }
         }.launchIn(viewModelScope)
     }
@@ -62,7 +64,7 @@ class SessionsViewModel @Inject constructor(
 
     private fun findUser() {
         viewModelScope.launch {
-            repository.getUser(ktor.uid).getOrNull()?.data?.let { user ->
+            electroRepository.getUser(uidProvider.getUid()).getOrNull()?.data?.let { user ->
                 updateState { it.copy(user = user) }
             }
         }
@@ -70,14 +72,14 @@ class SessionsViewModel @Inject constructor(
 
     private fun pullDialog(sid: Long) {
         viewModelScope.launch {
-            repository.pullDialog(sid)
+            electroRepository.pullDialog(sid)
         }
     }
 
     private fun pull() {
         viewModelScope.launch {
             changeRefreshState(true)
-            repository.pullDialogs()
+            electroRepository.pullDialogs()
             changeRefreshState(false)
         }
     }
@@ -94,15 +96,15 @@ class SessionsViewModel @Inject constructor(
     private fun findResource(id: String, image: String?, result: (Path?) -> Unit) {
         if (image == null) return
         viewModelScope.launch {
-            val path = repository.findResource(id)
+            val path = electroRepository.findResource(id)
             result(path)
             if (path?.path == null) {
-                repository.download(
+                electroRepository.download(
                     id,
                     image,
                     onSuccess = {
                         launch {
-                            result(repository.findResource(id))
+                            result(electroRepository.findResource(id))
                         }
                     }
                 )
@@ -112,7 +114,7 @@ class SessionsViewModel @Inject constructor(
 
     private fun switchAccount(uid: Long) {
         viewModelScope.launch {
-            repository.findAccount(uid)?.let { account ->
+            electroRepository.findAccount(uid)?.let { account ->
                 val token = account.token ?: return@launch
                 application.dataStore.edit {
                     it[Prefs.TOKEN] = token

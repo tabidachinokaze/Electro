@@ -1,16 +1,39 @@
 package moe.tabidachi.electro.ui.server
 
-import moe.tabidachi.electro.data.network.Ktor
+import android.content.Context
+import androidx.datastore.preferences.core.edit
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.ktor.http.URLBuilder
+import kotlinx.coroutines.launch
+import moe.tabidachi.electro.Prefs
+import moe.tabidachi.electro.data.repository.SharedRepository
+import moe.tabidachi.electro.ext.dataStore
 import moe.tabidachi.electro.ui.server.ServerContract.Event
 import moe.tabidachi.electro.ui.server.ServerContract.State
-import dagger.hilt.android.lifecycle.HiltViewModel
-import io.ktor.client.plugins.defaultRequest
 import javax.inject.Inject
 
 @HiltViewModel
 class ServerViewModel @Inject constructor(
-    val ktor: Ktor
+    @ApplicationContext
+    private val context: Context,
+    private val sharedRepository: SharedRepository,
 ) : ServerContract.ViewModel(State()) {
+    init {
+        updateState {
+            val sharedState = sharedRepository.state.value
+            val baseUrl = URLBuilder(sharedState.baseUrl)
+            val minioUrl = URLBuilder(sharedState.minioUrl)
+            it.copy(
+                url = "${baseUrl.protocol.name}://${baseUrl.host}",
+                port = baseUrl.port.toString(),
+                minioUrl = "${minioUrl.protocol.name}://${minioUrl.host}",
+                minioPort = minioUrl.port.toString(),
+            )
+        }
+    }
+
     override fun event(event: Event) = when (event) {
         Event.HideDialog -> hideDialog()
         is Event.OnDialogValueChange -> onDialogValueChange(event.value)
@@ -44,12 +67,29 @@ class ServerViewModel @Inject constructor(
         }
 
         hideDialog()
+        sharedRepository.updateState {
+            val state = state.value
+            val baseUrl = URLBuilder(state.url).apply {
+                state.port.toIntOrNull()?.let {
+                    this.port = it
+                }
+            }.buildString()
 
-        ktor.client.config {
-            defaultRequest {
-                this.host = state.value.url
-                this.port = state.value.port.toInt()
+            val minioUrl = URLBuilder(state.minioUrl).apply {
+                state.minioPort.toIntOrNull()?.let {
+                    this.port = it
+                }
+            }.buildString()
+            viewModelScope.launch {
+                context.dataStore.edit {
+                    it[Prefs.BASE_URL] = baseUrl
+                    it[Prefs.MINIO_URL] = minioUrl
+                }
             }
+            it.copy(
+                baseUrl = baseUrl,
+                minioUrl = minioUrl,
+            )
         }
     }
 

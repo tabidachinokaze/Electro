@@ -4,7 +4,7 @@ import android.media.MediaPlayer
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import moe.tabidachi.electro.data.Repository
+import moe.tabidachi.electro.data.ElectroRepository
 import moe.tabidachi.electro.data.database.entity.MessageSendRequest
 import moe.tabidachi.electro.data.database.entity.MessageType
 import moe.tabidachi.electro.model.attachment.Attachment
@@ -17,7 +17,7 @@ class UploadMessageItem(
     val message: MessageSendRequest,
     val attachment: Attachment?,
     override val scope: CoroutineScope,
-    val repository: Repository
+    val electroRepository: ElectroRepository
 ) : Playable(scope) {
     var state by mutableStateOf<UploadState>(UploadState.Pause)
     var path by mutableStateOf<String?>(null)
@@ -25,7 +25,7 @@ class UploadMessageItem(
 
     init {
         scope.launch {
-            path = repository.findResource(message.identification())?.path
+            path = electroRepository.findResource(message.identification())?.path
         }
         scope.launch {
             upload()
@@ -37,7 +37,7 @@ class UploadMessageItem(
         uploadJob?.cancel()
         uploadJob = scope.launch {
             state = UploadState.Uploading(0f)
-            repository.sendMessage(
+            electroRepository.sendMessage(
                 message, onFailure = {
                     state = UploadState.Failure
                 }, onProgress = {
@@ -77,7 +77,7 @@ class UploadMessageItem(
     fun cancelMessage() {
         scope.launch {
             // TODO 还需处理，文件缓存，云端缓存
-            repository.cancelSendingMessage(message.id)
+            electroRepository.cancelSendingMessage(message.id)
         }
     }
 }

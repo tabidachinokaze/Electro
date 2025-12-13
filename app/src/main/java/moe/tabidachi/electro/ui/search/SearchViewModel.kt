@@ -2,21 +2,23 @@ package moe.tabidachi.electro.ui.search
 
 import android.app.Application
 import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.launch
 import moe.tabidachi.electro.R
-import moe.tabidachi.electro.data.Repository
+import moe.tabidachi.electro.data.ElectroRepository
 import moe.tabidachi.electro.data.database.entity.SessionType
 import moe.tabidachi.electro.data.database.entity.SessionUserState
+import moe.tabidachi.electro.data.service.SessionApi
 import moe.tabidachi.electro.ext.toast
 import moe.tabidachi.electro.ui.search.SearchContract.Event
 import moe.tabidachi.electro.ui.search.SearchContract.State
-import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     private val application: Application,
-    private val repository: Repository,
+    private val electroRepository: ElectroRepository,
+    private val sessionApi: SessionApi,
 ) : SearchContract.ViewModel(State()) {
     override fun event(event: Event) = when (event) {
         is Event.NavigateToGroup -> Unit
@@ -29,7 +31,7 @@ class SearchViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            repository.loadSearch()?.let {
+            electroRepository.loadSearch()?.let {
                 onSearch(it)
             }
         }
@@ -46,12 +48,12 @@ class SearchViewModel @Inject constructor(
     private fun onSearch(query: String = state.value.query) {
         viewModelScope.launch {
             launch {
-                repository.queryUserFlow(query).let { userQueries ->
+                electroRepository.queryUserFlow(query).let { userQueries ->
                     updateState { it.copy(users = UserSearchState.Success(userQueries)) }
                 }
             }
             launch {
-                repository.sessionSearch(query).collect { list ->
+                electroRepository.sessionSearch(query).let { list ->
                     list.groupBy { it.type }.let { typeListMap ->
                         updateState {
                             it.copy(
@@ -67,21 +69,21 @@ class SearchViewModel @Inject constructor(
                 }
             }
             launch {
-                repository.dialogsFlow(query).collect { dialogs ->
+                electroRepository.dialogsFlow(query).let { dialogs ->
                     updateState {
                         it.copy(dialogs = DialogSearchState.Success(dialogs))
                     }
                 }
             }
             launch {
-                repository.saveSearch(query)
+                electroRepository.saveSearch(query)
             }
         }
     }
 
     private fun onGroupJoinRequest(sid: Long) {
         viewModelScope.launch {
-            repository.onSessionJoinRequest(sid).onSuccess {
+            runCatching { sessionApi.onSessionJoinRequest(sid) }.onSuccess {
                 when (it.data) {
                     SessionUserState.REQUEST -> {
                         application.toast(application.resources.getString(R.string.request_success))

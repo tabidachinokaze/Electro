@@ -6,13 +6,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
-import moe.tabidachi.electro.data.Repository
-import moe.tabidachi.electro.data.database.entity.Message
-import moe.tabidachi.electro.data.network.Ktor
-import moe.tabidachi.electro.data.network.MessageType
-import moe.tabidachi.electro.model.attachment.Attachment
-import moe.tabidachi.electro.model.attachment.deserialize
-import moe.tabidachi.electro.ui.common.BubbleType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,11 +19,16 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import moe.tabidachi.electro.data.ElectroRepository
+import moe.tabidachi.electro.data.database.entity.Message
+import moe.tabidachi.electro.data.network.ElectroWebSocket
+import moe.tabidachi.electro.data.network.MessageType
+import moe.tabidachi.electro.data.provider.UidProvider
+import moe.tabidachi.electro.model.attachment.Attachment
+import moe.tabidachi.electro.model.attachment.deserialize
+import moe.tabidachi.electro.ui.common.BubbleType
 
 interface Messenger {
-    //val repository: Repository
-    //val ktor: Ktor
-    //val scope: CoroutineScope
     val sid: StateFlow<Long?>
     val messages: SnapshotStateList<DownloadMessageItem>
     val uploadMessages: SnapshotStateList<UploadMessageItem>
@@ -98,9 +96,10 @@ object EmptyMessenger : Messenger {
 }
 
 open class BaseMessenger(
-    private val repository: Repository,
-    private val ktor: Ktor,
+    private val electroRepository: ElectroRepository,
     private val scope: CoroutineScope,
+    private val ws: ElectroWebSocket,
+    private val uidProvider: UidProvider,
     sid: Long?
 ) : Messenger {
     override val messages: SnapshotStateList<DownloadMessageItem> = mutableStateListOf()
@@ -133,13 +132,13 @@ open class BaseMessenger(
 
     private fun send(webSocketMessage: WebSocketMessage, retry: Boolean = false) {
         scope.launch {
-            ktor.ws.connected.takeWhile { !it }.collect()
-            ktor.ws.send(
+            ws.connected.takeWhile { !it }.collect()
+            ws.send(
                 webSocketMessage,
                 onFailure = {
                     if (retry) {
                         scope.launch {
-                            ktor.ws.connected.takeWhile { !it }.collect()
+                            ws.connected.takeWhile { !it }.collect()
                             send(it)
                         }
                     }
@@ -180,14 +179,14 @@ open class BaseMessenger(
 
     override fun initWebSocket() {
         scope.launch {
-            ktor.ws.onWebSocketMessage.collectLatest { message ->
+            ws.onWebSocketMessage.collectLatest { message ->
                 println(message)
                 when (message.header.type) {
                     MessageType.Message.New.toString() -> {
                         val pair =
                             String(message.body).let<String, Pair<Long, Long>>(Json::decodeFromString)
                         if (pair.first == sid.value) {
-                            repository.message(pair.second).onSuccess {
+                            electroRepository.message(pair.second).onSuccess {
                                 it.data?.let { it1 ->
                                     insert(messageToItem(it1))
                                 }
@@ -202,7 +201,7 @@ open class BaseMessenger(
                         val pair =
                             String(message.body).let<String, Pair<Long, Long>>(Json::decodeFromString)
                         if (pair.first == sid.value) {
-                            repository.deleteLocalMessage(pair.second)
+                            electroRepository.deleteLocalMessage(pair.second)
                             messages.removeIf { it.message.mid == pair.second }
                         }
                     }
@@ -230,8 +229,9 @@ open class BaseMessenger(
     private fun remoteAfterMessage(sid: Long) {
         scope.launch {
             val time =
-                repository.getLatestMessageInSession(sid)?.createTime ?: System.currentTimeMillis()
-            repository.remoteAfterMessage(sid, time).onSuccess {
+                electroRepository.getLatestMessageInSession(sid)?.createTime
+                    ?: System.currentTimeMillis()
+            electroRepository.remoteAfterMessage(sid, time).onSuccess {
                 it.data?.forEach {
                     insert(messageToItem(it))
                 }
@@ -242,11 +242,11 @@ open class BaseMessenger(
     private fun localBeforeMessage(sid: Long, time: Long, onProcess: (Boolean) -> Unit) {
         scope.launch {
             onProcess(true)
-            repository.localBeforeMessage(sid, time, 10).onEach {
+            electroRepository.localBeforeMessage(sid, time, 10).onEach {
                 insert(messageToItem(it))
             }.let {
                 if (it.isEmpty()) {
-                    repository.remoteBeforeMessage(sid, time, 10).onSuccess { (_, _, data) ->
+                    electroRepository.remoteBeforeMessage(sid, time, 10).onSuccess { (_, _, data) ->
                         data?.forEach {
                             insert(messageToItem(it))
                         }
@@ -274,11 +274,11 @@ open class BaseMessenger(
 
     private fun messageToItem(message: Message): DownloadMessageItem {
         return DownloadMessageItem(
-            type = if (message.uid == ktor.uid) BubbleType.Outgoing else BubbleType.Incoming,
+            type = if (message.uid == uidProvider.getUid()) BubbleType.Outgoing else BubbleType.Incoming,
             message = message,
             attachment = Attachment.deserialize(message.type, message.attachment),
-            repository = repository,
-            scope
+            electroRepository = electroRepository,
+            scope = scope
         )
     }
 
@@ -286,7 +286,7 @@ open class BaseMessenger(
     private fun messageSendingQueue(sid: Long) {
         job?.cancel()
         job = scope.launch {
-            repository.messageSendingQueue(sid).collect {
+            electroRepository.messageSendingQueue(sid).collect {
                 val news = it.map { it.id }
                 val olds = uploadMessages.map { it.message.id }
                 olds.forEach { old ->
@@ -302,7 +302,7 @@ open class BaseMessenger(
                                 message,
                                 Attachment.deserialize(message.type, message.attachment),
                                 scope,
-                                repository
+                                electroRepository
                             )
                         )
                     }
@@ -328,7 +328,7 @@ open class BaseMessenger(
 
     override fun deleteMessage(mid: Long) {
         scope.launch {
-            repository.deleteMessage(mid)
+            electroRepository.deleteMessage(mid)
         }
     }
 
@@ -354,7 +354,7 @@ open class BaseMessenger(
         val sid = sid.value ?: return
         messages.firstOrNull()?.let {
             scope.launch {
-                repository.readMessage(sid, it.message.createTime)
+                electroRepository.readMessage(sid, it.message.createTime)
             }
         }
     }

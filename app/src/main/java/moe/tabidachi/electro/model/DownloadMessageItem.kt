@@ -10,7 +10,11 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
-import moe.tabidachi.electro.data.Repository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import moe.tabidachi.electro.data.ElectroRepository
 import moe.tabidachi.electro.data.database.entity.Message
 import moe.tabidachi.electro.data.database.entity.MessageType
 import moe.tabidachi.electro.data.database.entity.User
@@ -21,16 +25,12 @@ import moe.tabidachi.electro.model.attachment.LocationAttachment
 import moe.tabidachi.electro.model.attachment.WebRTCAttachment
 import moe.tabidachi.electro.ui.common.BubbleType
 import moe.tabidachi.electro.ui.common.MessageMenu
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 class DownloadMessageItem(
     val type: BubbleType,
     val message: Message,
     val attachment: Attachment?,
-    val repository: Repository,
+    val electroRepository: ElectroRepository,
     override val scope: CoroutineScope
 ) : Playable(scope) {
     var path by mutableStateOf<String?>(null)
@@ -54,7 +54,7 @@ class DownloadMessageItem(
                 menus.addIfAbsent(MessageMenu.Copy)
             }
 //            menus.add(MessageMenu.Edit)
-            if (message.uid == repository.ktor.uid) {
+            if (type == BubbleType.Outgoing) {
                 menus.add(MessageMenu.Delete)
             }
 //            menus.add(MessageMenu.Forward)
@@ -75,14 +75,14 @@ class DownloadMessageItem(
 
     suspend fun findUser() {
         if (user != null) return
-        repository.getUser(message.uid).onSuccess {
+        electroRepository.getUser(message.uid).onSuccess {
             user = it.data
         }
     }
 
     suspend fun find() {
         if (path != null) return
-        path = repository.findResource(message.identification())?.path?.also {
+        path = electroRepository.findResource(message.identification())?.path?.also {
             if (message.type == MessageType.AUDIO) {
                 val retriever = MediaMetadataRetriever()
                 retriever.setDataSource(it)
@@ -117,7 +117,7 @@ class DownloadMessageItem(
                     downloading = true
                     when {
                         attachment.url != null -> {
-                            repository.download(
+                            electroRepository.download(
                                 message.identification(),
                                 attachment.url!!,
                                 onSuccess = {
@@ -134,7 +134,7 @@ class DownloadMessageItem(
                         }
 
                         attachment.bucket != null && attachment.`object` != null -> {
-                            repository.download(
+                            electroRepository.download(
                                 id = message.identification(),
                                 bucket = attachment.bucket!!,
                                 `object` = attachment.`object`!!,

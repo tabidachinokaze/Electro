@@ -1,9 +1,9 @@
 package moe.tabidachi.electro.data.database.entity
 
 import androidx.room.Entity
-import moe.tabidachi.electro.data.network.DialogResponse
-import moe.tabidachi.electro.model.Identifiable
 import kotlinx.serialization.Serializable
+import moe.tabidachi.electro.model.Identifiable
+import moe.tabidachi.electro.model.response.DialogResponse
 
 @Entity(primaryKeys = ["sid", "uid"])
 @Serializable
@@ -29,5 +29,6 @@ data class Dialog(
         response.unread,
         response.extras,
     )
+
     override fun identification() = "dialog.$sid.$uid.$image"
 }

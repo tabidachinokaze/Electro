@@ -5,8 +5,6 @@ import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.messaging.FirebaseMessaging
 import dagger.hilt.android.lifecycle.HiltViewModel
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -16,8 +14,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import moe.tabidachi.compose.mvi.BaseViewModel
 import moe.tabidachi.electro.ElectroContract.State
-import moe.tabidachi.electro.data.Repository
-import moe.tabidachi.electro.data.network.Ktor
+import moe.tabidachi.electro.data.ElectroRepository
+import moe.tabidachi.electro.data.network.ElectroWebSocket
+import moe.tabidachi.electro.data.repository.SharedRepository
+import moe.tabidachi.electro.data.service.FirebaseApi
 import moe.tabidachi.electro.ext.dataStore
 import moe.tabidachi.electro.ktx.TAG
 import moe.tabidachi.electro.ui.auth.AuthRoute
@@ -30,8 +30,10 @@ import javax.inject.Inject
 @HiltViewModel
 class ElectroViewModel @Inject constructor(
     private val application: Application,
-    val ktor: Ktor,
-    private val repository: Repository
+    private val electroRepository: ElectroRepository,
+    private val sharedRepository: SharedRepository,
+    private val webSocket: ElectroWebSocket,
+    private val firebaseApi: FirebaseApi
 ) : ElectroContract.ViewModel(State()) {
     init {
         val account = application.dataStore.data.map {
@@ -39,24 +41,32 @@ class ElectroViewModel @Inject constructor(
         }
         viewModelScope.launch {
             account.collectLatest { (token: String?, uid: Long) ->
+                Log.d(TAG, "token = ${token}, uid = $uid")
                 if (token.isNullOrBlank() || uid == 0L) {
                     updateState { it.copy(startDestination = AuthRoute) }
-                    ktor.ws.pause()
-                    ktor.ws.close()
+                    webSocket.pause()
+                    webSocket.close()
                 } else {
-                    if (ktor.token != token && ktor.uid != uid) {
-                        ktor.ws.close()
-                        updateState { it.copy(startDestination = SplashRoute) }
+                    with(sharedRepository.state.value) {
+                        Log.d(
+                            TAG,
+                            "currentUserId = ${currentUserId}, tokens[currentUserId] = ${tokens[currentUserId]}"
+                        )
+                        if (currentUserId != uid && tokens[currentUserId] != token) {
+                            webSocket.close()
+                            updateState { it.copy(startDestination = SplashRoute) }
+                        }
                     }
-                    ktor.token = token
-                    ktor.uid = uid
+                    sharedRepository.updateState {
+                        it.copy(
+                            currentUserId = uid,
+                            tokens = it.tokens.toMutableMap().apply { this[uid] = token })
+                    }
 
                     FirebaseMessaging.getInstance().token.addOnCompleteListener {
                         viewModelScope.launch {
                             runCatching {
-                                ktor.client.post("/firebase") {
-                                    setBody(it.result)
-                                }
+                                firebaseApi.firebase(it.result)
                             }.onFailure {
                                 Log.d(TAG, "getDeviceToken: onFailure")
                                 it.printStackTrace()
@@ -65,7 +75,7 @@ class ElectroViewModel @Inject constructor(
                             }
                         }
                     }
-                    ktor.ws.resume()
+                    webSocket.resume()
                     delay(200)
                     updateState { it.copy(startDestination = SessionsRoute) }
                 }
@@ -95,7 +105,12 @@ class ElectroViewModel @Inject constructor(
         val state = DownloadState()
         map[id] = state
         viewModelScope.launch {
-            repository.download(id, url, state.onSuccess, progressListener = state.progressListener)
+            electroRepository.download(
+                id,
+                url,
+                state.onSuccess,
+                progressListener = state.progressListener
+            )
         }
         return state
     }

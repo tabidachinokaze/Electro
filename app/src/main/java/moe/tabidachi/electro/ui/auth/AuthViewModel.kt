@@ -17,7 +17,8 @@ import moe.tabidachi.electro.Prefs
 import moe.tabidachi.electro.R
 import moe.tabidachi.electro.data.database.ElectroDatabase
 import moe.tabidachi.electro.data.database.entity.Account
-import moe.tabidachi.electro.data.network.Ktor
+import moe.tabidachi.electro.data.service.AuthApi
+import moe.tabidachi.electro.data.service.UserApi
 import moe.tabidachi.electro.ext.dataStore
 import moe.tabidachi.electro.ext.isEmail
 import moe.tabidachi.electro.ext.isValidPassword
@@ -34,8 +35,9 @@ import javax.inject.Inject
 class AuthViewModel @Inject constructor(
     @ApplicationContext
     private val context: Context,
-    private val ktor: Ktor,
     private val database: ElectroDatabase,
+    private val authApi: AuthApi,
+    private val userApi: UserApi
 ) : BaseViewModel<State, Event, Effect>(State()), AuthContract.ViewModel {
     override fun event(event: Event) = when (event) {
         Event.Auth -> auth()
@@ -59,7 +61,7 @@ class AuthViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            ktor.checkUserExist(email.text).onSuccess {
+            runCatching { userApi.checkUserExist(email.text) }.onSuccess {
                 if (it.status == HttpStatusCode.OK.value) {
                     if (it.data != null) {
                         emitEffect(Effect.Toast(context.resources.getString(R.string.user_registered)))
@@ -71,7 +73,9 @@ class AuthViewModel @Inject constructor(
                     CaptchaRequest.Method.EMAIL,
                     CaptchaRequest.Type.REGISTER
                 )
-                ktor.captcha(captchaRequest).onSuccess {
+                runCatching {
+                    authApi.captcha(captchaRequest)
+                }.onSuccess {
                     updateState { it.copy(buttonEnabled = false) }
                     launch {
                         val countDown = 60
@@ -128,7 +132,7 @@ class AuthViewModel @Inject constructor(
 
                     state.value.method == AuthMethod.REGISTER -> {
                         changeProcessing(true)
-                        ktor.checkUserExist(state.value.request.first.text).also {
+                        runCatching { userApi.checkUserExist(state.value.request.first.text) }.also {
                             changeProcessing(false)
                         }.onSuccess {
                             if (it.status == HttpStatusCode.OK.value) {
@@ -150,7 +154,7 @@ class AuthViewModel @Inject constructor(
 
                     state.value.method == AuthMethod.LOGIN -> {
                         changeProcessing(true)
-                        ktor.checkUserExist(state.value.request.first.text).also {
+                        runCatching { userApi.checkUserExist(state.value.request.first.text) }.also {
                             changeProcessing(false)
                         }.onSuccess {
                             if (it.status == HttpStatusCode.NotFound.value) {
@@ -172,7 +176,7 @@ class AuthViewModel @Inject constructor(
                     state.value.request.let {
                         LoginRequest(it.first.text, it.second.text)
                     }.let {
-                        ktor.login(it).onSuccess {
+                        runCatching { authApi.login(it) }.onSuccess {
                             Log.d(TAG, "auth: $it")
                         }.onFailure {
                             Log.e(TAG, "auth: login", it)
@@ -184,7 +188,7 @@ class AuthViewModel @Inject constructor(
                     state.value.request.let {
                         RegisterRequest(it.first.text, it.second.text, it.third.text)
                     }.let {
-                        ktor.register(it).onSuccess {
+                        runCatching { authApi.register(it) }.onSuccess {
                             Log.d(TAG, "auth: $it")
                         }.onFailure {
                             Log.e(TAG, "auth: login", it)

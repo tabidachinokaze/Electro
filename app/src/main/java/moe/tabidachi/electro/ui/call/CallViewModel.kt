@@ -4,28 +4,33 @@ import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.viewModelScope
-import moe.tabidachi.electro.ANSWER_ACTION
-import moe.tabidachi.electro.Factory
-import moe.tabidachi.electro.OFFER_ACTION
-import moe.tabidachi.electro.data.Repository
-import moe.tabidachi.electro.data.network.ElectroWebSocket
-import moe.tabidachi.electro.data.network.Ktor
-import moe.tabidachi.electro.data.network.MessageType
-import moe.tabidachi.electro.ktx.TAG
-import moe.tabidachi.electro.model.WebSocketMessage
-import moe.tabidachi.electro.model.header
-import moe.tabidachi.electro.ui.call.CallContract.Effect
-import moe.tabidachi.electro.ui.call.CallContract.Event
-import moe.tabidachi.electro.ui.call.CallContract.State
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.ktor.client.HttpClient
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import moe.tabidachi.compose.mvi.BaseViewModel
+import moe.tabidachi.electro.ANSWER_ACTION
+import moe.tabidachi.electro.Factory
+import moe.tabidachi.electro.OFFER_ACTION
+import moe.tabidachi.electro.data.ElectroRepository
+import moe.tabidachi.electro.data.network.ElectroWebSocket
+import moe.tabidachi.electro.data.network.MessageType
+import moe.tabidachi.electro.data.provider.BaseUrlProvider
+import moe.tabidachi.electro.data.repository.SharedRepository
+import moe.tabidachi.electro.ktx.TAG
+import moe.tabidachi.electro.model.WebSocketMessage
+import moe.tabidachi.electro.model.header
+import moe.tabidachi.electro.shared.SharedHttpClient
+import moe.tabidachi.electro.shared.SharedJson
+import moe.tabidachi.electro.ui.call.CallContract.Effect
+import moe.tabidachi.electro.ui.call.CallContract.Event
+import moe.tabidachi.electro.ui.call.CallContract.State
 import org.webrtc.IceCandidate
 import javax.inject.Inject
 
@@ -33,12 +38,15 @@ import javax.inject.Inject
 class CallViewModel @Inject constructor(
     @ApplicationContext
     private val context: Context,
-    private val repository: Repository,
-    val ktor: Ktor
+    private val electroRepository: ElectroRepository,
+    private val client: HttpClient,
+    private val sharedRepository: SharedRepository,
+    private val webSocket: ElectroWebSocket,
+    private val baseUrlProvider: BaseUrlProvider
 ) : BaseViewModel<State, Event, Effect>(State()), CallContract.ViewModel {
     private var isCalled = false
     val factory = Factory(context)
-    private lateinit var ws: ElectroWebSocket
+    private var ws: ElectroWebSocket = webSocket
 
     private val connection = factory.createPeerConnection(
         Factory.Callback(
@@ -154,7 +162,6 @@ class CallViewModel @Inject constructor(
         }
     }
 
-    private var newKtor: Ktor? = null
     private fun init(offer: Long, answer: Long, action: String) {
         if (isCalled) return
         updateState {
@@ -170,27 +177,30 @@ class CallViewModel @Inject constructor(
         viewModelScope.launch {
             when (action) {
                 OFFER_ACTION -> {
-                    repository.getUser(answer).onSuccess {
+                    electroRepository.getUser(answer).onSuccess {
                         it.data?.let { user ->
                             updateState { it.copy(user = user) }
                         }
                     }
-                    ws = ktor.ws
                 }
 
                 ANSWER_ACTION -> {
-                    repository.getUser(offer).onSuccess {
+                    electroRepository.getUser(offer).onSuccess {
                         it.data?.let { user ->
                             updateState { it.copy(user = user) }
                         }
                     }
-                    val account = repository.findAccount(answer) ?: return@launch
+                    val account = electroRepository.findAccount(answer) ?: return@launch
                     println(account)
-                    newKtor = Ktor(context).apply {
-                        this.token = account.token
-                        this.uid = account.uid
-                    }
-                    ws = newKtor!!.ws
+                    val client = SharedHttpClient(
+                        json = SharedJson(),
+                        tokenProvider = { account.token },
+                        onUrlConvertConfig = {}
+                    )
+                    ws = ElectroWebSocket(
+                        client = client,
+                        baseUrlProvider = baseUrlProvider
+                    )
                 }
             }
             ws.pingPong.isCall = true
@@ -308,7 +318,7 @@ class CallViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         ws.pingPong.isCall = false
-        newKtor?.close()
+        runBlocking { ws.close() }
     }
 }
 
@@ -330,4 +340,5 @@ data class RemoteIceCandidate(
         iceCandidate.sdp
     )
 }
+
 fun RemoteIceCandidate.toLocal() = IceCandidate(this.sdpMid, this.sdpMLineIndex, this.sdp)

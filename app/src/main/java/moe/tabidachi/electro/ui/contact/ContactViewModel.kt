@@ -1,25 +1,30 @@
 package moe.tabidachi.electro.ui.contact
 
 import androidx.lifecycle.viewModelScope
-import moe.tabidachi.electro.data.Repository
-import moe.tabidachi.electro.data.network.Ktor
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.launch
+import moe.tabidachi.electro.data.ElectroRepository
+import moe.tabidachi.electro.data.network.ElectroWebSocket
+import moe.tabidachi.electro.data.provider.UidProvider
+import moe.tabidachi.electro.data.service.ContactApi
 import moe.tabidachi.electro.model.BaseMessenger
 import moe.tabidachi.electro.model.Messenger
 import moe.tabidachi.electro.ui.contact.ContactContract.State
-import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class ContactViewModel @Inject constructor(
-    private val repository: Repository,
-    private val ktor: Ktor,
+    private val electroRepository: ElectroRepository,
+    private val contactApi: ContactApi,
+    webSocket: ElectroWebSocket,
+    private val uidProvider: UidProvider,
 ) : ContactContract.ViewModel(State()) {
     val messenger: Messenger = BaseMessenger(
-        repository = repository,
-        ktor = ktor,
+        electroRepository = electroRepository,
         scope = viewModelScope,
         sid = 0,
+        ws = webSocket,
+        uidProvider = uidProvider,
     )
 
     override fun event(event: ContactContract.Event) {
@@ -35,9 +40,9 @@ class ContactViewModel @Inject constructor(
 
     private fun getContact() {
         viewModelScope.launch {
-            repository.contact().onSuccess {
+            runCatching { contactApi.contact() }.onSuccess {
                 it.data?.mapNotNull {
-                    repository.getUser(it).getOrNull()?.data
+                    electroRepository.getUser(it).getOrNull()?.data
                 }?.let { users ->
                     updateState { it.copy(users = users) }
                 }

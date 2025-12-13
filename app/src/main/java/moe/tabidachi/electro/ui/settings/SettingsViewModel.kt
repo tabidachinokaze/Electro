@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.ktor.client.HttpClient
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.HttpStatusCode
@@ -14,7 +15,6 @@ import io.ktor.http.URLBuilder
 import io.ktor.http.URLProtocol
 import io.ktor.http.Url
 import io.ktor.util.generateNonce
-import io.minio.GetPresignedObjectUrlArgs
 import io.minio.http.Method
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
@@ -23,9 +23,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.tabidachi.electro.Prefs
-import moe.tabidachi.electro.data.Repository
-import moe.tabidachi.electro.data.network.Ktor
+import moe.tabidachi.electro.data.ElectroRepository
 import moe.tabidachi.electro.data.network.MinIO
+import moe.tabidachi.electro.data.provider.UidProvider
+import moe.tabidachi.electro.data.service.UserApi
 import moe.tabidachi.electro.ext.MINIO
 import moe.tabidachi.electro.ext.dataStore
 import moe.tabidachi.electro.model.request.UserUpdateRequest
@@ -39,9 +40,11 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val application: Application,
-    private val ktor: Ktor,
     private val minio: MinIO,
-    private val repository: Repository
+    private val electroRepository: ElectroRepository,
+    private val userApi: UserApi,
+    private val uidProvider: UidProvider,
+    private val client: HttpClient,
 ) : SettingsContract.ViewModel(State()) {
     override fun event(event: Event) = when (event) {
         Event.GetUser -> getUser()
@@ -85,7 +88,7 @@ class SettingsViewModel @Inject constructor(
 
     private fun getUser() {
         viewModelScope.launch {
-            ktor.getUser(ktor.uid).onSuccess {
+            runCatching { userApi.getUser(uidProvider.getUid()) }.onSuccess {
                 it.data?.let { user ->
                     updateState { it.copy(user = user) }
                 }
@@ -110,20 +113,14 @@ class SettingsViewModel @Inject constructor(
 
     private fun updateAvatar(bitmap: ImageBitmap) {
         viewModelScope.launch {
-            minio.checkOrCreateBucket(MinIO.AVATAR)
-            val filename = generateNonce()
-            val url = minio.client.getPresignedObjectUrl(
-                GetPresignedObjectUrlArgs.builder()
-                    .method(Method.PUT)
-                    .bucket(MinIO.AVATAR)
-                    .`object`(filename)
-                    .build()
-            )
             withContext(Dispatchers.IO) {
                 val outputStream = ByteArrayOutputStream()
+                val filename = generateNonce()
                 kotlin.runCatching {
+                    minio.checkOrCreateBucket(MinIO.AVATAR)
+                    val url = minio.getPresignedObjectUrl(Method.PUT, MinIO.AVATAR, filename)!!
                     bitmap.asAndroidBitmap().compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
-                    ktor.upload.put(url) {
+                    client.put(url) {
                         setBody(outputStream.toByteArray())
                     }
                 }.onSuccess {
@@ -134,10 +131,14 @@ class SettingsViewModel @Inject constructor(
                                 pathSegments = listOf(MinIO.AVATAR, filename)
                             )
                         ).toString()
-                        ktor.userUpdate(UserUpdateRequest(null, null, null, url)).onSuccess {
+                        runCatching {
+                            userApi.userUpdate(UserUpdateRequest(null, null, null, url))
+                        }.onSuccess {
                             getUser()
                         }
                     }
+                }.onFailure {
+                    it.printStackTrace()
                 }
                 outputStream.close()
             }
@@ -146,7 +147,7 @@ class SettingsViewModel @Inject constructor(
 
     private fun logout() {
         viewModelScope.launch {
-            repository.removeAccount(ktor.uid)
+            electroRepository.removeAccount(uidProvider.getUid())
             application.dataStore.edit {
                 it[Prefs.THEME] = ""
                 it[Prefs.UID] = 0

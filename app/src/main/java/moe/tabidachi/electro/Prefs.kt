@@ -8,4 +8,6 @@ object Prefs {
     val DARK_LIGHT = stringPreferencesKey("dark_light")
     val TOKEN = stringPreferencesKey("token")
     val UID = longPreferencesKey("uid")
+    val BASE_URL = stringPreferencesKey("base_url")
+    val MINIO_URL = stringPreferencesKey("minio_url")
 }

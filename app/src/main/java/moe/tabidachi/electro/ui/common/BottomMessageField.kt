@@ -40,30 +40,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.view.ContentInfoCompat
 import androidx.core.view.OnReceiveContentListener
-import moe.tabidachi.electro.LocationActivity
-import moe.tabidachi.electro.R
-import moe.tabidachi.electro.coil.BlurTransformation
-import moe.tabidachi.electro.data.Repository
-import moe.tabidachi.electro.data.database.entity.Message
-import moe.tabidachi.electro.data.database.entity.MessageSendRequest
-import moe.tabidachi.electro.data.database.entity.MessageType
-import moe.tabidachi.electro.data.database.entity.Path
-import moe.tabidachi.electro.data.network.Ktor
-import moe.tabidachi.electro.ext.checkPermission
-import moe.tabidachi.electro.ext.longTimeFormat
-import moe.tabidachi.electro.ext.openableColumns
-import moe.tabidachi.electro.model.Playable
-import moe.tabidachi.electro.model.attachment.Attachment
-import moe.tabidachi.electro.model.attachment.AudioAttachment
-import moe.tabidachi.electro.model.attachment.FileAttachment
-import moe.tabidachi.electro.model.attachment.ImageAttachment
-import moe.tabidachi.electro.model.attachment.LocationAttachment
-import moe.tabidachi.electro.model.attachment.VideoAttachment
-import moe.tabidachi.electro.model.attachment.VoiceAttachment
-import moe.tabidachi.electro.model.attachment.WebRTCAttachment
-import moe.tabidachi.electro.model.attachment.convert
-import moe.tabidachi.electro.model.attachment.deserialize
-import moe.tabidachi.electro.model.attachment.serialize
 import coil3.executeBlocking
 import coil3.imageLoader
 import coil3.request.ErrorResult
@@ -85,6 +61,30 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import moe.tabidachi.electro.LocationActivity
+import moe.tabidachi.electro.R
+import moe.tabidachi.electro.coil.BlurTransformation
+import moe.tabidachi.electro.data.ElectroRepository
+import moe.tabidachi.electro.data.database.entity.Message
+import moe.tabidachi.electro.data.database.entity.MessageSendRequest
+import moe.tabidachi.electro.data.database.entity.MessageType
+import moe.tabidachi.electro.data.database.entity.Path
+import moe.tabidachi.electro.data.provider.UidProvider
+import moe.tabidachi.electro.ext.checkPermission
+import moe.tabidachi.electro.ext.longTimeFormat
+import moe.tabidachi.electro.ext.openableColumns
+import moe.tabidachi.electro.model.Playable
+import moe.tabidachi.electro.model.attachment.Attachment
+import moe.tabidachi.electro.model.attachment.AudioAttachment
+import moe.tabidachi.electro.model.attachment.FileAttachment
+import moe.tabidachi.electro.model.attachment.ImageAttachment
+import moe.tabidachi.electro.model.attachment.LocationAttachment
+import moe.tabidachi.electro.model.attachment.VideoAttachment
+import moe.tabidachi.electro.model.attachment.VoiceAttachment
+import moe.tabidachi.electro.model.attachment.WebRTCAttachment
+import moe.tabidachi.electro.model.attachment.convert
+import moe.tabidachi.electro.model.attachment.deserialize
+import moe.tabidachi.electro.model.attachment.serialize
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
@@ -316,8 +316,8 @@ object EmptyMessageManager : MessageManager {
 
 class MessageManagerImpl(
     private val context: Context,
-    private val repository: Repository,
-    private val ktor: Ktor,
+    private val electroRepository: ElectroRepository,
+    private val uidProvider: UidProvider,
     val scope: CoroutineScope
 ) : MessageManager {
     private val _viewState = MutableStateFlow(MessageViewState())
@@ -392,8 +392,8 @@ class MessageManagerImpl(
             val reply = replyRequest()
             val sid = sessionIdRequest() ?: return@launch
             val message = createAttachmentMessage(sid, reply, attachment)
-            repository.saveResource(Path(message.identification(), recordedFile.toString()))
-            repository.addMessageRequest(message)
+            electroRepository.saveResource(Path(message.identification(), recordedFile.toString()))
+            electroRepository.addMessageRequest(message)
             onSuccess()
         }
     }
@@ -493,9 +493,9 @@ class MessageManagerImpl(
                                 ?.toLongOrNull()?.let(this::duration::set)
                             this.thumb =
                                 (
-                                    retriever.embeddedPicture
-                                        ?: retriever.frameAtTime
-                                    )?.let(::loadInSize)
+                                        retriever.embeddedPicture
+                                            ?: retriever.frameAtTime
+                                        )?.let(::loadInSize)
                                     ?.let(::blur)?.let(::blur)?.let(::blur)?.let(::quality)
                             retriever.release()
                         }.onFailure {
@@ -583,7 +583,7 @@ class MessageManagerImpl(
         return MessageSendRequest(
             UUID.randomUUID().toString(),
             sid,
-            ktor.uid,
+            uidProvider.getUid(),
             null,
             reply,
             type = MessageType.TEXT,
@@ -602,7 +602,7 @@ class MessageManagerImpl(
         return MessageSendRequest(
             UUID.randomUUID().toString(),
             sid,
-            ktor.uid,
+            uidProvider.getUid(),
             null,
             reply,
             type = attachment.convert(),
@@ -620,7 +620,7 @@ class MessageManagerImpl(
         return MessageSendRequest(
             UUID.randomUUID().toString(),
             sid,
-            ktor.uid,
+            uidProvider.getUid(),
             null,
             reply,
             type = attachment.convert(),
@@ -668,7 +668,7 @@ class MessageManagerImpl(
                     }
                 }
             }.forEach {
-                repository.addMessageRequest(it)
+                electroRepository.addMessageRequest(it)
             }.run {
                 cleanMessageField()
                 onSuccess()
@@ -689,7 +689,7 @@ class MessageManagerImpl(
                 address = poiItem.adName
                 snippet = poiItem.snippet
             }
-            repository.addMessageRequest(createAttachmentMessage(sid, null, attachment))
+            electroRepository.addMessageRequest(createAttachmentMessage(sid, null, attachment))
         }
 
     fun sendLocationMessage(sessionIdRequest: suspend () -> Long?, latLng: LatLng) =
@@ -699,7 +699,7 @@ class MessageManagerImpl(
                 latitude = latLng.latitude
                 longitude = latLng.longitude
             }
-            repository.addMessageRequest(createAttachmentMessage(sid, null, attachment))
+            electroRepository.addMessageRequest(createAttachmentMessage(sid, null, attachment))
         }
 
     override fun sendLocationMessage(
@@ -709,7 +709,7 @@ class MessageManagerImpl(
         scope.launch {
             val sid = sessionIdRequest() ?: return@launch
             val attachment = attachment ?: return@launch
-            repository.addMessageRequest(createAttachmentMessage(sid, null, attachment))
+            electroRepository.addMessageRequest(createAttachmentMessage(sid, null, attachment))
         }
     }
 

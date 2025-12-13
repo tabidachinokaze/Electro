@@ -1,12 +1,10 @@
 package moe.tabidachi.electro.data.network
 
 import android.util.Log
-import moe.tabidachi.electro.model.WebSocketMessage
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.websocket.ClientWebSocketSession
 import io.ktor.client.plugins.websocket.cio.webSocketRawSession
-import io.ktor.client.request.port
-import io.ktor.http.takeFrom
+import io.ktor.http.URLBuilder
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
@@ -25,17 +23,23 @@ import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import moe.tabidachi.electro.data.provider.BaseUrlProvider
+import moe.tabidachi.electro.model.WebSocketMessage
 import org.koitharu.pausingcoroutinedispatcher.launchPausing
 import java.util.concurrent.atomic.AtomicInteger
 
 interface WebSocket {
     val onWebSocketMessage: SharedFlow<WebSocketMessage>
-    fun send(webSocketMessage: WebSocketMessage, onSuccess: () -> Unit = {}, onFailure: (WebSocketMessage) -> Unit = {})
+    fun send(
+        webSocketMessage: WebSocketMessage,
+        onSuccess: () -> Unit = {},
+        onFailure: (WebSocketMessage) -> Unit = {}
+    )
 }
 
 class ElectroWebSocket(
     private val client: HttpClient,
-    private val port: Int
+    private val baseUrlProvider: BaseUrlProvider
 ) : WebSocket {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var session: ClientWebSocketSession? = null
@@ -92,7 +96,11 @@ class ElectroWebSocket(
         isPause.value = false
     }
 
-    override fun send(webSocketMessage: WebSocketMessage, onSuccess: () -> Unit, onFailure: (WebSocketMessage) -> Unit) {
+    override fun send(
+        webSocketMessage: WebSocketMessage,
+        onSuccess: () -> Unit,
+        onFailure: (WebSocketMessage) -> Unit
+    ) {
         Log.d(TAG, "$webSocketMessage")
         kotlin.runCatching {
             Json.encodeToString(webSocketMessage)
@@ -138,10 +146,8 @@ class ElectroWebSocket(
 
     private suspend fun connect(): Result<ClientWebSocketSession> {
         return kotlin.runCatching {
-            client.webSocketRawSession {
-                url.takeFrom("/")
-                port = this@ElectroWebSocket.port
-            }
+            val urlBuilder = URLBuilder(baseUrlProvider.getBaseUrl())
+            client.webSocketRawSession(host = urlBuilder.host, port = urlBuilder.port)
         }
     }
 
@@ -222,6 +228,7 @@ class MessageType(
             }
             return MessageType(type, subtype)
         }
+
         val Unknown = MessageType("*", "*")
     }
 

@@ -14,11 +14,20 @@ import com.microsoft.appcenter.analytics.Analytics
 import com.microsoft.appcenter.crashes.Crashes
 import com.microsoft.appcenter.distribute.Distribute
 import dagger.hilt.android.HiltAndroidApp
+import io.ktor.client.HttpClient
+import moe.tabidachi.electro.initializer.Initializer
+import javax.inject.Inject
 
 @HiltAndroidApp
 class ElectroApplication : Application(), SingletonImageLoader.Factory {
+    @Inject
+    lateinit var client: HttpClient
+    @Inject
+    lateinit var initializer: Initializer
+
     override fun onCreate() {
         super.onCreate()
+        initializer.invoke()
         AppCenter.start(
             this,
             BuildConfig.APP_CENTER_SECRET,
@@ -33,7 +42,7 @@ class ElectroApplication : Application(), SingletonImageLoader.Factory {
     override fun newImageLoader(context: PlatformContext): ImageLoader {
         return ImageLoader.Builder(this)
             .components {
-                add(KtorNetworkFetcherFactory())
+                add(KtorNetworkFetcherFactory(client))
                 add(AnimatedImageDecoder.Factory())
                 add(SvgDecoder.Factory())
                 add(VideoFrameDecoder.Factory())

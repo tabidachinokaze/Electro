@@ -3,16 +3,15 @@ package moe.tabidachi.electro.di
 import android.app.Application
 import android.content.Context
 import androidx.room.Room
-import moe.tabidachi.electro.ElectroStorage
-import moe.tabidachi.electro.data.Repository
-import moe.tabidachi.electro.data.database.ElectroDatabase
-import moe.tabidachi.electro.data.network.Ktor
-import moe.tabidachi.electro.data.network.MinIO
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import moe.tabidachi.electro.ElectroStorage
+import moe.tabidachi.electro.data.database.ElectroDatabase
+import moe.tabidachi.electro.data.network.MinIO
+import moe.tabidachi.electro.data.repository.SharedRepository
 import javax.inject.Qualifier
 import javax.inject.Singleton
 
@@ -21,25 +20,18 @@ import javax.inject.Singleton
 object ElectroModule {
     @Singleton
     @Provides
-    fun provideKtorClient(
-        application: Application
-    ): Ktor {
-        return Ktor(application)
-    }
-
-    @Singleton
-    @Provides
-    fun provideMinio(): MinIO {
-        return MinIO()
+    fun provideMinio(
+        sharedRepository: SharedRepository
+    ): MinIO {
+        return MinIO(sharedRepository)
     }
 
     @Singleton
     @Provides
     fun provideStorage(
         application: Application,
-        ktor: Ktor
     ): ElectroStorage {
-        return ElectroStorage(application = application, ktor = ktor)
+        return ElectroStorage(application = application)
     }
 }
 
@@ -54,20 +46,6 @@ annotation class LocalDataSource
 @Module
 @InstallIn(SingletonComponent::class)
 object DataSourceModule {}
-
-@Module
-@InstallIn(SingletonComponent::class)
-object RepositoryModule {
-    @Singleton
-    @Provides
-    fun provideRepository(
-        application: Application,
-        database: ElectroDatabase,
-        ktor: Ktor,
-        storage: ElectroStorage,
-        minio: MinIO
-    ) = Repository(application, database, ktor, storage, minio)
-}
 
 @Module
 @InstallIn(SingletonComponent::class)

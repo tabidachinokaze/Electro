@@ -6,9 +6,27 @@ import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
-import moe.tabidachi.electro.data.Repository
-import moe.tabidachi.electro.data.network.Ktor
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.ktor.client.HttpClient
+import io.ktor.client.request.put
+import io.ktor.client.request.setBody
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.URLBuilder
+import io.ktor.http.URLProtocol
+import io.ktor.http.Url
+import io.ktor.util.generateNonce
+import io.minio.http.Method
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import moe.tabidachi.electro.data.ElectroRepository
+import moe.tabidachi.electro.data.network.ElectroWebSocket
 import moe.tabidachi.electro.data.network.MinIO
+import moe.tabidachi.electro.data.provider.UidProvider
+import moe.tabidachi.electro.data.service.ChannelApi
+import moe.tabidachi.electro.data.service.ContactApi
+import moe.tabidachi.electro.data.service.SessionApi
 import moe.tabidachi.electro.ext.MINIO
 import moe.tabidachi.electro.model.BaseMessenger
 import moe.tabidachi.electro.model.Messenger
@@ -19,20 +37,6 @@ import moe.tabidachi.electro.ui.channel.ChannelContract.Event
 import moe.tabidachi.electro.ui.channel.ChannelContract.State
 import moe.tabidachi.electro.ui.common.MessageManager
 import moe.tabidachi.electro.ui.common.MessageManagerImpl
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
-import io.ktor.client.request.put
-import io.ktor.client.request.setBody
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.URLBuilder
-import io.ktor.http.URLProtocol
-import io.ktor.http.Url
-import io.ktor.util.generateNonce
-import io.minio.GetPresignedObjectUrlArgs
-import io.minio.http.Method
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 
@@ -40,23 +44,29 @@ import javax.inject.Inject
 class ChannelViewModel @Inject constructor(
     @ApplicationContext
     private val context: Context,
-    private val repository: Repository,
-    private val ktor: Ktor,
+    private val electroRepository: ElectroRepository,
     private val minio: MinIO,
+    private val contactApi: ContactApi,
+    private val sessionApi: SessionApi,
+    private val channelApi: ChannelApi,
+    private val uidProvider: UidProvider,
+    private val client: HttpClient,
+    webSocket: ElectroWebSocket,
     savedStateHandle: SavedStateHandle
 ) : ChannelContract.ViewModel(initialState = State()) {
     private val route = savedStateHandle.toRoute<ChannelRoute>()
     val messenger: Messenger = BaseMessenger(
-        repository = repository,
-        ktor = ktor,
+        electroRepository = electroRepository,
         scope = viewModelScope,
-        sid = route.sid
+        sid = route.sid,
+        ws = webSocket,
+        uidProvider = uidProvider
     )
     val messageManager: MessageManager = MessageManagerImpl(
         context = context,
-        repository = repository,
-        ktor = ktor,
-        scope = viewModelScope
+        electroRepository = electroRepository,
+        uidProvider = uidProvider,
+        scope = viewModelScope,
     )
 
     init {
@@ -93,7 +103,7 @@ class ChannelViewModel @Inject constructor(
 
     private fun getSessionInfo(sid: Long) {
         viewModelScope.launch {
-            repository.getDialog(sid).collect { dialog ->
+            electroRepository.getDialog(sid)?.let { dialog ->
                 updateState { it.copy(dialog = dialog) }
             }
         }
@@ -101,9 +111,9 @@ class ChannelViewModel @Inject constructor(
 
     private fun getSessionUser(sid: Long) {
         viewModelScope.launch {
-            repository.getSessionUser(sid).collect {
+            electroRepository.getSessionUser(sid).let {
                 it.mapNotNull {
-                    repository.getUser(it).getOrNull()?.data
+                    electroRepository.getUser(it).getOrNull()?.data
                 }.also { users ->
                     updateState { it.copy(users = users) }
                 }.forEach {
@@ -115,10 +125,10 @@ class ChannelViewModel @Inject constructor(
 
     private fun getAdmin(sid: Long) {
         viewModelScope.launch {
-            repository.getChannelAdmins(sid).onSuccess {
+            runCatching { channelApi.getChannelAdmins(sid) }.onSuccess {
                 it.data?.also { roles ->
                     Log.d("ChannelViewModel", "getAdmin: ${roles.size}")
-                    val isAdmin = roles.any { it.uid == ktor.uid }
+                    val isAdmin = roles.any { it.uid == uidProvider.getUid() }
                     val owner = roles.firstOrNull { it.type == ChannelRoleType.OWNER }
                     updateState {
                         it.copy(
@@ -137,7 +147,7 @@ class ChannelViewModel @Inject constructor(
 
     private fun removeAdmin(target: Long) {
         viewModelScope.launch {
-            repository.removeChannelAdmin(route.sid, target).onSuccess {
+            runCatching { channelApi.removeChannelAdmin(route.sid, target) }.onSuccess {
                 if (it.status == HttpStatusCode.OK.value) {
                     it.data?.let { target ->
                         updateState {
@@ -157,7 +167,7 @@ class ChannelViewModel @Inject constructor(
 
     private fun addAdmin(target: Long) {
         viewModelScope.launch {
-            repository.addChannelAdmin(route.sid, target).onSuccess {
+            runCatching { channelApi.addChannelAdmin(route.sid, target) }.onSuccess {
                 if (it.status == HttpStatusCode.OK.value) {
                     it.data?.let { role ->
                         updateState {
@@ -175,7 +185,7 @@ class ChannelViewModel @Inject constructor(
 
     private fun removeMember(target: Long) {
         viewModelScope.launch {
-            repository.removeChannelMember(route.sid, target).onSuccess {
+            runCatching { channelApi.removeChannelMember(route.sid, target) }.onSuccess {
                 if (it.status == HttpStatusCode.OK.value) {
                     it.data?.let { target ->
                         updateState {
@@ -200,7 +210,7 @@ class ChannelViewModel @Inject constructor(
     private fun invite(target: Long) {
         val sid = route.sid
         viewModelScope.launch {
-            repository.invite(sid, target).onSuccess {
+            runCatching { sessionApi.invite(sid, target) }.onSuccess {
                 it.data?.let {
                     getSessionUser(sid)
                 }
@@ -210,9 +220,11 @@ class ChannelViewModel @Inject constructor(
 
     private fun getContact() {
         viewModelScope.launch {
-            repository.contact().onSuccess {
+            runCatching {
+                contactApi.contact()
+            }.onSuccess {
                 it.data?.mapNotNull {
-                    repository.getUser(it).getOrNull()?.data
+                    electroRepository.getUser(it).getOrNull()?.data
                 }?.let { contacts ->
                     updateState { it.copy(contacts = contacts) }
                 }
@@ -222,7 +234,7 @@ class ChannelViewModel @Inject constructor(
 
     private fun exitGroup(sid: Long) {
         viewModelScope.launch {
-            repository.exitSession(sid).onSuccess {
+            runCatching { sessionApi.exitSession(sid) }.onSuccess {
                 it.data?.let {
                     updateState { it.copy(isExit = true) }
                     emitEffect(Effect.NavigateUp)
@@ -248,31 +260,26 @@ class ChannelViewModel @Inject constructor(
                 return@launch
             }
             val description = viewState.description.ifBlank { null }
-            repository.updateChannelInfo(sid, ChannelUpdateRequest(image, title, description))
-                .onSuccess {
-                    it.data?.let {
-                        emitEffect(Effect.NavigateUp)
-                    }
+            runCatching {
+                channelApi.updateChannelInfo(sid, ChannelUpdateRequest(image, title, description))
+            }.onSuccess {
+                it.data?.let {
+                    emitEffect(Effect.NavigateUp)
                 }
+            }
         }
     }
 
     private suspend fun uploadImage(bitmap: Bitmap): String? {
         minio.checkOrCreateBucket(MinIO.AVATAR)
         val filename = generateNonce()
-        val url = minio.client.getPresignedObjectUrl(
-            GetPresignedObjectUrlArgs.builder()
-                .method(Method.PUT)
-                .bucket(MinIO.AVATAR)
-                .`object`(filename)
-                .build()
-        )
+        val url = minio.getPresignedObjectUrl(Method.PUT, MinIO.AVATAR, filename)!!
         return withContext(Dispatchers.IO) {
             ByteArrayOutputStream().use { outputStream ->
                 if (
                     runCatching {
                         bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
-                        ktor.upload.put(url) {
+                        client.put(url) {
                             setBody(outputStream.toByteArray())
                         }
                     }.getOrNull()?.status == HttpStatusCode.OK
@@ -292,7 +299,7 @@ class ChannelViewModel @Inject constructor(
 
     private fun findSession() {
         viewModelScope.launch {
-            repository.findSession(route.sid).collect { session ->
+            electroRepository.findSession(route.sid)?.let { session ->
                 updateState {
                     it.copy(
                         session = session,

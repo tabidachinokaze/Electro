@@ -24,23 +24,25 @@ import androidx.core.graphics.drawable.toBitmap
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.AndroidEntryPoint
+import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import moe.tabidachi.electro.data.network.Ktor
 import javax.inject.Inject
 import kotlin.random.Random
 
 @AndroidEntryPoint
 class ElectroMessagingService : FirebaseMessagingService() {
-    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     @Inject
-    lateinit var ktor: Ktor
+    lateinit var client: HttpClient
+
     override fun onNewToken(token: String) {
         super.onNewToken(token)
         Log.d(TAG, "onNewToken: $token")
@@ -51,24 +53,29 @@ class ElectroMessagingService : FirebaseMessagingService() {
         super.onMessageReceived(message)
         Log.d(TAG, "onMessageReceived: ${message.data}")
         if (message.data["type"] == "call") {
-            val nid = Random.nextInt()
-            val data = message.data.apply {
-                put("notification_id", nid.toString())
-            }
-            val image = data["image"]?.let { ktor.convert(it).buildString() }
-            val bitmap = runBlocking {
-                image?.runCatching {
-                    val channel = ktor.upload.get(this).bodyAsChannel()
-                    BitmapFactory.decodeStream(channel.toInputStream())
-                }?.getOrNull()
-            }
-            val notification = ElectroNotification(this).call(bitmap, data)
-            if (ActivityCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) == PackageManager.PERMISSION_GRANTED
-            ) {
-                NotificationManagerCompat.from(this).notify(nid, notification)
+            scope.launch {
+                val nid = Random.nextInt()
+                val data = message.data.apply {
+                    put("notification_id", nid.toString())
+                }
+                val image = data["image"]
+                val bitmap = runBlocking {
+                    image?.runCatching {
+                        val channel = client.get(this).bodyAsChannel()
+                        BitmapFactory.decodeStream(channel.toInputStream())
+                    }?.getOrNull()
+                }
+                val notification = ElectroNotification(this@ElectroMessagingService)
+                    .call(bitmap, data)
+                if (
+                    ActivityCompat.checkSelfPermission(
+                        this@ElectroMessagingService,
+                        Manifest.permission.POST_NOTIFICATIONS
+                    ) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    NotificationManagerCompat.from(this@ElectroMessagingService)
+                        .notify(nid, notification)
+                }
             }
         }
     }
