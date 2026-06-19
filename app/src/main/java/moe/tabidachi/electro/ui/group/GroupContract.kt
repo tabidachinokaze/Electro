@@ -1,15 +1,21 @@
 package moe.tabidachi.electro.ui.group
 
 import android.graphics.Bitmap
+import dagger.assisted.AssistedFactory
+import moe.tabidachi.compose.mvi.BaseViewModel
 import moe.tabidachi.electro.data.database.entity.Dialog
 import moe.tabidachi.electro.data.database.entity.Session
 import moe.tabidachi.electro.data.database.entity.User
 import moe.tabidachi.electro.model.response.GroupRole
-import moe.tabidachi.compose.mvi.BaseViewModel
 
 interface GroupContract {
     abstract class ViewModel(initialState: State) :
         BaseViewModel<State, Event, Effect>(initialState)
+
+    @AssistedFactory
+    interface Factory {
+        fun create(navKey: GroupRoute): GroupViewModel
+    }
 
     data class State(
         val dialog: Dialog? = null,

@@ -2,15 +2,21 @@ package moe.tabidachi.electro.ui.pair
 
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import dagger.assisted.AssistedFactory
+import moe.tabidachi.compose.mvi.BaseViewModel
 import moe.tabidachi.electro.data.database.entity.Message
 import moe.tabidachi.electro.data.database.entity.User
 import moe.tabidachi.electro.model.attachment.Attachment
-import moe.tabidachi.compose.mvi.BaseViewModel
 
 interface PairContract {
     abstract class ViewModel(
         initialState: State
     ) : BaseViewModel<State, Event, Effect>(initialState)
+
+    @AssistedFactory
+    interface Factory {
+        fun create(route: PairRoute): PairViewModel
+    }
 
     data class State(
         val uid: Long,

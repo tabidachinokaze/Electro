@@ -9,9 +9,9 @@ import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.cancel
@@ -33,10 +33,9 @@ import moe.tabidachi.electro.ui.common.MessageManager
 import moe.tabidachi.electro.ui.common.MessageManagerImpl
 import moe.tabidachi.electro.ui.pair.PairContract.Event
 import moe.tabidachi.electro.ui.pair.PairContract.State
-import javax.inject.Inject
 
-@HiltViewModel
-class PairViewModel @Inject constructor(
+@HiltViewModel(assistedFactory = PairContract.Factory::class)
+class PairViewModel @AssistedInject constructor(
     @ApplicationContext
     private val context: Context,
     private val electroRepository: ElectroRepository,
@@ -45,11 +44,12 @@ class PairViewModel @Inject constructor(
     private val userApi: UserApi,
     private val uidProvider: UidProvider,
     private val webSocket: ElectroWebSocket,
-    savedStateHandle: SavedStateHandle
+    @Assisted
+    val target: PairRoute
 ) : PairContract.ViewModel(
     initialState = State(
         uid = uidProvider.getUid(),
-        target = savedStateHandle.toRoute<PairRoute>().target
+        target = target.target
     )
 ) {
     val messenger: Messenger = object : BaseMessenger(

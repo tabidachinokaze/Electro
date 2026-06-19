@@ -45,6 +45,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
 import moe.tabidachi.electro.R
 import moe.tabidachi.electro.model.EmptyMessenger
 import moe.tabidachi.electro.model.Messenger
@@ -59,7 +62,7 @@ import kotlinx.serialization.Serializable
 import moe.tabidachi.compose.mvi.observe
 
 @Serializable
-data object ChannelDetailRoute
+data object ChannelDetailRoute : NavKey
 
 context(navController: NavHostController)
 fun NavGraphBuilder.channelDetail() = composable<ChannelDetailRoute> {
@@ -89,6 +92,37 @@ fun NavGraphBuilder.channelDetail() = composable<ChannelDetailRoute> {
 
 fun NavHostController.navigateToChannelDetail() {
     navigate(ChannelDetailRoute)
+}
+
+context(backStack: NavBackStack<NavKey>)
+fun EntryProviderScope<NavKey>.channelDetail(
+    viewModel: ChannelViewModel,
+    onNavigateUp: () -> Unit
+) = entry<ChannelDetailRoute> {
+    val (state, event) = viewModel.observe {
+        when (it) {
+            ChannelContract.Effect.NavigateUp -> onNavigateUp()
+        }
+    }
+    ChannelDetailScreen(
+        state = state.value,
+        event = {
+            when (it) {
+                is Event.NavigateToChannelAdmin -> backStack.navigateToChannelAdmin()
+                is Event.NavigateToChannelDetail -> backStack.navigateToChannelDetail()
+                is Event.NavigateToChannelEdit -> backStack.navigateToChannelEdit()
+                is Event.NavigateToChannelInvite -> backStack.navigateToChannelInvite()
+                is Event.NavigateToPair -> backStack.navigateToPair(it.uid)
+                Event.NavigateUp -> onNavigateUp()
+                else -> event(it)
+            }
+        },
+        messenger = viewModel.messenger
+    )
+}
+
+fun NavBackStack<NavKey>.navigateToChannelDetail() {
+    add(ChannelDetailRoute)
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)

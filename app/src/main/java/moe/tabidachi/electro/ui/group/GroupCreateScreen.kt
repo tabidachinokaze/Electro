@@ -49,6 +49,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
 import com.mr0xf00.easycrop.CropResult
 import com.mr0xf00.easycrop.crop
 import com.mr0xf00.easycrop.rememberImageCropper
@@ -85,7 +88,7 @@ import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 
 @Serializable
-data object GroupCreateRoute
+data object GroupCreateRoute : NavKey
 
 context(navController: NavHostController)
 fun NavGraphBuilder.groupCreate() = composable<GroupCreateRoute> {
@@ -110,6 +113,31 @@ fun NavGraphBuilder.groupCreate() = composable<GroupCreateRoute> {
 
 fun NavHostController.navigateToGroupCreate() {
     navigate(GroupCreateRoute)
+}
+
+context(backStack: NavBackStack<NavKey>)
+fun EntryProviderScope<NavKey>.groupCreate() = entry<GroupCreateRoute> {
+    val viewModel: CreateGroupViewModel = hiltViewModel()
+    val (state, event) = viewModel.observe {
+        when (it) {
+            is Effect.NavigateUpAndNavigateToChannel -> {
+                backStack.navigateToGroup(it.sid)
+            }
+        }
+    }
+    GroupCreateScreen(
+        state = state.value,
+        event = {
+            when (it) {
+                Event.NavigateUp -> backStack.removeLastOrNull()
+                else -> event(it)
+            }
+        }
+    )
+}
+
+fun NavBackStack<NavKey>.navigateToGroupCreate() {
+    add(GroupCreateRoute)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

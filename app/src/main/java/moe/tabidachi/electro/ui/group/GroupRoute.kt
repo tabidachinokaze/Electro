@@ -4,14 +4,17 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
+import kotlinx.serialization.Serializable
+import moe.tabidachi.compose.mvi.observe
 import moe.tabidachi.electro.ui.common.MessageAction
 import moe.tabidachi.electro.ui.group.GroupContract.Event
 import moe.tabidachi.electro.ui.pair.navigateToPair
-import kotlinx.serialization.Serializable
-import moe.tabidachi.compose.mvi.observe
 
 @Serializable
-data class GroupRoute(val sid: Long)
+data class GroupRoute(val sid: Long) : NavKey
 
 context(navController: NavHostController)
 fun NavGraphBuilder.group() = composable<GroupRoute> {
@@ -45,4 +48,37 @@ fun NavGraphBuilder.group() = composable<GroupRoute> {
 
 fun NavHostController.navigateToGroup(sid: Long) {
     navigate(GroupRoute(sid))
+}
+
+context(backStack: NavBackStack<NavKey>)
+fun EntryProviderScope<NavKey>.group(viewModel: GroupViewModel) = entry<GroupRoute> {
+    val (state, event) = viewModel.observe {
+        when (it) {
+            GroupContract.Effect.NavigateUp -> backStack.removeLastOrNull()
+        }
+    }
+
+    GroupScreen(
+        state = state.value,
+        event = {
+            when (it) {
+                is Event.NavigateToChannelAdmin -> backStack.navigateToGroupAdmin()
+                is Event.NavigateToChannelDetail -> backStack.navigateToGroupDetail()
+                is Event.NavigateToChannelEdit -> backStack.navigateToGroupEdit()
+                is Event.NavigateToChannelInvite -> backStack.navigateToGroupInvite()
+                is Event.NavigateToPair -> backStack.navigateToPair(it.uid)
+                Event.NavigateUp -> backStack.removeLastOrNull()
+                else -> event(it)
+            }
+        },
+        messenger = viewModel.messenger,
+        messageManager = viewModel.messageManager,
+        action = MessageAction(
+            navigateToPair = backStack::navigateToPair
+        )
+    )
+}
+
+fun NavBackStack<NavKey>.navigateToGroup(sid: Long) {
+    add(GroupRoute(sid))
 }

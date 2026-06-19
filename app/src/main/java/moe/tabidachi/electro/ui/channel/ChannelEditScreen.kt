@@ -47,13 +47,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
-import moe.tabidachi.electro.R
-import moe.tabidachi.electro.ui.channel.ChannelContract.Event
-import moe.tabidachi.electro.ui.channel.ChannelContract.State
-import moe.tabidachi.electro.ui.common.SimpleTextField
-import moe.tabidachi.electro.ui.pair.navigateToPair
-import moe.tabidachi.electro.ui.preview.PreviewSurface
-import moe.tabidachi.electro.ui.preview.Previews
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
 import coil3.compose.AsyncImage
 import com.mr0xf00.easycrop.CropResult
 import com.mr0xf00.easycrop.crop
@@ -62,9 +58,16 @@ import com.mr0xf00.easycrop.ui.ImageCropperDialog
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import moe.tabidachi.compose.mvi.observe
+import moe.tabidachi.electro.R
+import moe.tabidachi.electro.ui.channel.ChannelContract.Event
+import moe.tabidachi.electro.ui.channel.ChannelContract.State
+import moe.tabidachi.electro.ui.common.SimpleTextField
+import moe.tabidachi.electro.ui.pair.navigateToPair
+import moe.tabidachi.electro.ui.preview.PreviewSurface
+import moe.tabidachi.electro.ui.preview.Previews
 
 @Serializable
-data object ChannelEditRoute
+data object ChannelEditRoute : NavKey
 
 context(navController: NavHostController)
 fun NavGraphBuilder.channelEdit() = composable<ChannelEditRoute> {
@@ -93,6 +96,36 @@ fun NavGraphBuilder.channelEdit() = composable<ChannelEditRoute> {
 
 fun NavHostController.navigateToChannelEdit() {
     navigate(ChannelEditRoute)
+}
+
+context(backStack: NavBackStack<NavKey>)
+fun EntryProviderScope<NavKey>.channelEdit(
+    viewModel: ChannelViewModel,
+    onNavigateUp: () -> Unit
+) = entry<ChannelEditRoute> {
+    val (state, event) = viewModel.observe {
+        when (it) {
+            ChannelContract.Effect.NavigateUp -> onNavigateUp()
+        }
+    }
+    ChannelEditScreen(
+        state = state.value,
+        event = {
+            when (it) {
+                is Event.NavigateToChannelAdmin -> backStack.navigateToChannelAdmin()
+                is Event.NavigateToChannelDetail -> backStack.navigateToChannelDetail()
+                is Event.NavigateToChannelEdit -> backStack.navigateToChannelEdit()
+                is Event.NavigateToChannelInvite -> backStack.navigateToChannelInvite()
+                is Event.NavigateToPair -> backStack.navigateToPair(it.uid)
+                Event.NavigateUp -> onNavigateUp()
+                else -> event(it)
+            }
+        }
+    )
+}
+
+fun NavBackStack<NavKey>.navigateToChannelEdit() {
+    add(ChannelEditRoute)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

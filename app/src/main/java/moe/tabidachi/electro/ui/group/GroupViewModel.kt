@@ -2,9 +2,9 @@ package moe.tabidachi.electro.ui.group
 
 import android.content.Context
 import android.graphics.Bitmap
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.ktor.client.HttpClient
@@ -36,10 +36,9 @@ import moe.tabidachi.electro.ui.group.GroupContract.Effect
 import moe.tabidachi.electro.ui.group.GroupContract.Event
 import moe.tabidachi.electro.ui.group.GroupContract.State
 import java.io.ByteArrayOutputStream
-import javax.inject.Inject
 
-@HiltViewModel
-class GroupViewModel @Inject constructor(
+@HiltViewModel(assistedFactory = GroupContract.Factory::class)
+class GroupViewModel @AssistedInject constructor(
     @ApplicationContext
     private val context: Context,
     private val electroRepository: ElectroRepository,
@@ -50,9 +49,9 @@ class GroupViewModel @Inject constructor(
     webSocket: ElectroWebSocket,
     private val uidProvider: UidProvider,
     private val client: HttpClient,
-    savedStateHandle: SavedStateHandle
+    @Assisted
+    val route: GroupRoute
 ) : GroupContract.ViewModel(State()) {
-    private val route: GroupRoute = savedStateHandle.toRoute<GroupRoute>()
     val messenger = BaseMessenger(
         electroRepository = electroRepository,
         scope = viewModelScope,

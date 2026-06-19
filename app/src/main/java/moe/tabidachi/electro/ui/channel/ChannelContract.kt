@@ -1,15 +1,21 @@
 package moe.tabidachi.electro.ui.channel
 
 import android.graphics.Bitmap
+import dagger.assisted.AssistedFactory
+import moe.tabidachi.compose.mvi.BaseViewModel
 import moe.tabidachi.electro.data.database.entity.Dialog
 import moe.tabidachi.electro.data.database.entity.Session
 import moe.tabidachi.electro.data.database.entity.User
 import moe.tabidachi.electro.model.response.ChannelRole
-import moe.tabidachi.compose.mvi.BaseViewModel
 
 interface ChannelContract {
     abstract class ViewModel(initialState: State) :
         BaseViewModel<State, Event, Effect>(initialState)
+
+    @AssistedFactory
+    interface Factory {
+        fun create(route: ChannelRoute): ChannelViewModel
+    }
 
     data class State(
         val dialog: Dialog? = null,

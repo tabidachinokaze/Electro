@@ -35,6 +35,12 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
+import coil3.compose.AsyncImage
+import kotlinx.serialization.Serializable
+import moe.tabidachi.compose.mvi.observe
 import moe.tabidachi.electro.R
 import moe.tabidachi.electro.ext.regex
 import moe.tabidachi.electro.model.EmptyMessenger
@@ -45,12 +51,9 @@ import moe.tabidachi.electro.ui.common.SimpleTextField
 import moe.tabidachi.electro.ui.pair.navigateToPair
 import moe.tabidachi.electro.ui.preview.PreviewSurface
 import moe.tabidachi.electro.ui.preview.Previews
-import coil3.compose.AsyncImage
-import kotlinx.serialization.Serializable
-import moe.tabidachi.compose.mvi.observe
 
 @Serializable
-data object ChannelInviteRoute
+data object ChannelInviteRoute : NavKey
 
 context(navController: NavHostController)
 fun NavGraphBuilder.channelInvite() = composable<ChannelInviteRoute> {
@@ -80,6 +83,37 @@ fun NavGraphBuilder.channelInvite() = composable<ChannelInviteRoute> {
 
 fun NavHostController.navigateToChannelInvite() {
     navigate(ChannelInviteRoute)
+}
+
+context(backStack: NavBackStack<NavKey>)
+fun EntryProviderScope<NavKey>.channelInvite(
+    viewModel: ChannelViewModel,
+    onNavigateUp: () -> Unit
+) = entry<ChannelInviteRoute> {
+    val (state, event) = viewModel.observe {
+        when (it) {
+            ChannelContract.Effect.NavigateUp -> onNavigateUp()
+        }
+    }
+    ChannelInviteScreen(
+        state = state.value,
+        event = {
+            when (it) {
+                is Event.NavigateToChannelAdmin -> backStack.navigateToChannelAdmin()
+                is Event.NavigateToChannelDetail -> backStack.navigateToChannelDetail()
+                is Event.NavigateToChannelEdit -> backStack.navigateToChannelEdit()
+                is Event.NavigateToChannelInvite -> backStack.navigateToChannelInvite()
+                is Event.NavigateToPair -> backStack.navigateToPair(it.uid)
+                Event.NavigateUp -> onNavigateUp()
+                else -> event(it)
+            }
+        },
+        messenger = viewModel.messenger
+    )
+}
+
+fun NavBackStack<NavKey>.navigateToChannelInvite() {
+    add(ChannelInviteRoute)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

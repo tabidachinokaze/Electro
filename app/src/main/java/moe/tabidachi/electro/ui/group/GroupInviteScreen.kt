@@ -35,6 +35,12 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
+import coil3.compose.AsyncImage
+import kotlinx.serialization.Serializable
+import moe.tabidachi.compose.mvi.observe
 import moe.tabidachi.electro.R
 import moe.tabidachi.electro.ext.regex
 import moe.tabidachi.electro.model.EmptyMessenger
@@ -45,12 +51,9 @@ import moe.tabidachi.electro.ui.group.GroupContract.State
 import moe.tabidachi.electro.ui.pair.navigateToPair
 import moe.tabidachi.electro.ui.preview.PreviewSurface
 import moe.tabidachi.electro.ui.preview.Previews
-import coil3.compose.AsyncImage
-import kotlinx.serialization.Serializable
-import moe.tabidachi.compose.mvi.observe
 
 @Serializable
-data object GroupInviteRoute
+data object GroupInviteRoute : NavKey
 
 context(navController: NavHostController)
 fun NavGraphBuilder.groupInvite() = composable<GroupInviteRoute> {
@@ -80,6 +83,37 @@ fun NavGraphBuilder.groupInvite() = composable<GroupInviteRoute> {
 
 fun NavHostController.navigateToGroupInvite() {
     navigate(GroupInviteRoute)
+}
+
+context(backStack: NavBackStack<NavKey>)
+fun EntryProviderScope<NavKey>.groupInvite(
+    viewModel: GroupViewModel,
+    onNavigateUp: () -> Unit
+) = entry<GroupInviteRoute> {
+    val (state, event) = viewModel.observe {
+        when (it) {
+            GroupContract.Effect.NavigateUp -> onNavigateUp()
+        }
+    }
+    GroupInviteScreen(
+        state = state.value,
+        event = {
+            when (it) {
+                is Event.NavigateToChannelAdmin -> backStack.navigateToGroupAdmin()
+                is Event.NavigateToChannelDetail -> backStack.navigateToGroupDetail()
+                is Event.NavigateToChannelEdit -> backStack.navigateToGroupEdit()
+                is Event.NavigateToChannelInvite -> backStack.navigateToGroupInvite()
+                is Event.NavigateToPair -> backStack.navigateToPair(it.uid)
+                Event.NavigateUp -> onNavigateUp()
+                else -> event(it)
+            }
+        },
+        messenger = viewModel.messenger
+    )
+}
+
+fun NavBackStack<NavKey>.navigateToGroupInvite() {
+    add(GroupInviteRoute)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

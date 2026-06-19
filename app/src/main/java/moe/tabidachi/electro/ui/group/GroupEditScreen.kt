@@ -47,13 +47,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
-import moe.tabidachi.electro.R
-import moe.tabidachi.electro.ui.common.SimpleTextField
-import moe.tabidachi.electro.ui.group.GroupContract.Event
-import moe.tabidachi.electro.ui.group.GroupContract.State
-import moe.tabidachi.electro.ui.pair.navigateToPair
-import moe.tabidachi.electro.ui.preview.PreviewSurface
-import moe.tabidachi.electro.ui.preview.Previews
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
 import coil3.compose.AsyncImage
 import com.mr0xf00.easycrop.CropResult
 import com.mr0xf00.easycrop.crop
@@ -62,9 +58,16 @@ import com.mr0xf00.easycrop.ui.ImageCropperDialog
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import moe.tabidachi.compose.mvi.observe
+import moe.tabidachi.electro.R
+import moe.tabidachi.electro.ui.common.SimpleTextField
+import moe.tabidachi.electro.ui.group.GroupContract.Event
+import moe.tabidachi.electro.ui.group.GroupContract.State
+import moe.tabidachi.electro.ui.pair.navigateToPair
+import moe.tabidachi.electro.ui.preview.PreviewSurface
+import moe.tabidachi.electro.ui.preview.Previews
 
 @Serializable
-data object GroupEditRoute
+data object GroupEditRoute : NavKey
 
 context(navController: NavHostController)
 fun NavGraphBuilder.groupEdit() = composable<GroupEditRoute> {
@@ -93,6 +96,36 @@ fun NavGraphBuilder.groupEdit() = composable<GroupEditRoute> {
 
 fun NavHostController.navigateToGroupEdit() {
     navigate(GroupEditRoute)
+}
+
+context(backStack: NavBackStack<NavKey>)
+fun EntryProviderScope<NavKey>.groupEdit(
+    viewModel: GroupViewModel,
+    onNavigateUp: () -> Unit
+) = entry<GroupEditRoute> {
+    val (state, event) = viewModel.observe {
+        when (it) {
+            GroupContract.Effect.NavigateUp -> onNavigateUp()
+        }
+    }
+    GroupEditScreen(
+        state = state.value,
+        event = {
+            when (it) {
+                is Event.NavigateToChannelAdmin -> backStack.navigateToGroupAdmin()
+                is Event.NavigateToChannelDetail -> backStack.navigateToGroupDetail()
+                is Event.NavigateToChannelEdit -> backStack.navigateToGroupEdit()
+                is Event.NavigateToChannelInvite -> backStack.navigateToGroupInvite()
+                is Event.NavigateToPair -> backStack.navigateToPair(it.uid)
+                Event.NavigateUp -> onNavigateUp()
+                else -> event(it)
+            }
+        }
+    )
+}
+
+fun NavBackStack<NavKey>.navigateToGroupEdit() {
+    add(GroupEditRoute)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

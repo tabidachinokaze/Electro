@@ -49,6 +49,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
 import com.mr0xf00.easycrop.CropResult
 import com.mr0xf00.easycrop.crop
 import com.mr0xf00.easycrop.rememberImageCropper
@@ -85,7 +88,7 @@ import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 
 @Serializable
-data object ChannelCreateRoute
+data object ChannelCreateRoute : NavKey
 
 context(navController: NavHostController)
 fun NavGraphBuilder.channelCreate() = composable<ChannelCreateRoute> {
@@ -111,6 +114,32 @@ fun NavGraphBuilder.channelCreate() = composable<ChannelCreateRoute> {
 
 fun NavHostController.navigateToChannelCreate() {
     navigate(ChannelCreateRoute)
+}
+
+context(backStack: NavBackStack<NavKey>)
+fun EntryProviderScope<NavKey>.channelCreate() = entry<ChannelCreateRoute> {
+    val viewModel: ChannelCreateViewModel = hiltViewModel()
+    val (state, event) = viewModel.observe {
+        when (it) {
+            is Effect.NavigateUpAndNavigateToChannel -> {
+                backStack.removeLastOrNull()
+                backStack.navigateToChannel(it.sid)
+            }
+        }
+    }
+    ChannelCreateScreen(
+        state = state.value,
+        event = {
+            when (it) {
+                Event.NavigateUp -> backStack.removeLastOrNull()
+                else -> event(it)
+            }
+        }
+    )
+}
+
+fun NavBackStack<NavKey>.navigateToChannelCreate() {
+    add(ChannelCreateRoute)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

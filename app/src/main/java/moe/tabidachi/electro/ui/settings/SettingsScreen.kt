@@ -30,15 +30,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
-import moe.tabidachi.electro.R
-import moe.tabidachi.electro.ext.navigateToLocaleSettings
-import moe.tabidachi.electro.ui.common.ImageTopAppBar
-import moe.tabidachi.electro.ui.common.SimpleListItem
-import moe.tabidachi.electro.ui.preview.PreviewSurface
-import moe.tabidachi.electro.ui.preview.Previews
-import moe.tabidachi.electro.ui.profile.navigateToProfile
-import moe.tabidachi.electro.ui.settings.SettingsContract.Event
-import moe.tabidachi.electro.ui.settings.SettingsContract.State
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
 import coil3.compose.AsyncImage
 import com.mr0xf00.easycrop.CropResult
 import com.mr0xf00.easycrop.crop
@@ -48,9 +42,18 @@ import com.mr0xf00.easycrop.ui.ImageCropperDialog
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import moe.tabidachi.compose.mvi.observe
+import moe.tabidachi.electro.R
+import moe.tabidachi.electro.ext.navigateToLocaleSettings
+import moe.tabidachi.electro.ui.common.ImageTopAppBar
+import moe.tabidachi.electro.ui.common.SimpleListItem
+import moe.tabidachi.electro.ui.preview.PreviewSurface
+import moe.tabidachi.electro.ui.preview.Previews
+import moe.tabidachi.electro.ui.profile.navigateToProfile
+import moe.tabidachi.electro.ui.settings.SettingsContract.Event
+import moe.tabidachi.electro.ui.settings.SettingsContract.State
 
 @Serializable
-data object SettingsRoute
+data object SettingsRoute : NavKey
 
 context(navController: NavHostController)
 fun NavGraphBuilder.settings() = composable<SettingsRoute> {
@@ -72,6 +75,28 @@ fun NavGraphBuilder.settings() = composable<SettingsRoute> {
 
 fun NavHostController.navigateToSettings() {
     navigate(SettingsRoute)
+}
+
+context(backStack: NavBackStack<NavKey>)
+fun EntryProviderScope<NavKey>.settings() = entry<SettingsRoute> {
+    val context = LocalContext.current
+    val viewModel: SettingsViewModel = hiltViewModel()
+    val (state, event) = viewModel.observe { }
+    SettingsScreen(
+        state = state.value,
+        event = {
+            when (it) {
+                Event.NavigateToProfile -> backStack.navigateToProfile()
+                Event.NavigateUp -> backStack.removeLastOrNull()
+                Event.NavigateToLocaleSettings -> context.navigateToLocaleSettings()
+                else -> event(it)
+            }
+        }
+    )
+}
+
+fun NavBackStack<NavKey>.navigateToSettings() {
+    add(SettingsRoute)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

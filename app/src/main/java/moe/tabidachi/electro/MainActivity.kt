@@ -6,17 +6,20 @@ import androidx.activity.ComponentActivity
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
+import androidx.navigation3.runtime.rememberNavBackStack
 import com.microsoft.appcenter.distribute.Distribute
 import com.microsoft.appcenter.distribute.DistributeListener
 import com.microsoft.appcenter.distribute.ReleaseDetails
 import dagger.hilt.android.AndroidEntryPoint
 import moe.tabidachi.compose.mvi.observe
 import moe.tabidachi.electro.ext.toast
+import moe.tabidachi.electro.ui.ElectroNavDisplay
 import moe.tabidachi.electro.ui.ElectroNavGraph
 import moe.tabidachi.electro.ui.common.ReleaseDialog
 import moe.tabidachi.electro.ui.theme.ElectroTheme
@@ -43,7 +46,15 @@ class MainActivity : ComponentActivity(), DistributeListener {
                         Surface(
                             modifier = Modifier.fillMaxSize(),
                         ) {
-                            ElectroNavGraph(startDestination = state.value.startDestination)
+                            val backStack = rememberNavBackStack(state.value.startDestination)
+                            LaunchedEffect(state.value.startDestination) {
+                                backStack.clear()
+                                backStack.add(state.value.startDestination)
+                            }
+                            ElectroNavDisplay(
+                                startDestination = state.value.startDestination,
+                                backStack = backStack
+                            )
                         }
                         ReleaseDialog(
                             visible = updateDialogVisible,

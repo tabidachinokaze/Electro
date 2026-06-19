@@ -188,6 +188,9 @@ dependencies {
     implementation(project(":compose-mvi"))
     runtimeOnly("stax:stax-api:1.0.1")
     runtimeOnly("stax:stax:1.2.0")
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigation3.ui)
+    implementation(libs.lifecycle.viewmodel.navigation3)
     // test
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.ext.junit)

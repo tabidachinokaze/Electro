@@ -3,6 +3,7 @@ package moe.tabidachi.electro
 import android.app.Application
 import android.util.Log
 import androidx.lifecycle.viewModelScope
+import androidx.navigation3.runtime.NavKey
 import com.google.firebase.messaging.FirebaseMessaging
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
@@ -134,7 +135,7 @@ interface ElectroContract {
 
     data class State(
         val token: String? = null,
-        val startDestination: Any = SplashRoute,
+        val startDestination: NavKey = SplashRoute,
         val darkLight: DarkLight = DarkLight.SYSTEM,
         val theme: Theme = Theme.Dynamic
     )

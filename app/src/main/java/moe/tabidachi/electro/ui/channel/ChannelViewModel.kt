@@ -3,9 +3,9 @@ package moe.tabidachi.electro.ui.channel
 import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.ktor.client.HttpClient
@@ -38,10 +38,9 @@ import moe.tabidachi.electro.ui.channel.ChannelContract.State
 import moe.tabidachi.electro.ui.common.MessageManager
 import moe.tabidachi.electro.ui.common.MessageManagerImpl
 import java.io.ByteArrayOutputStream
-import javax.inject.Inject
 
-@HiltViewModel
-class ChannelViewModel @Inject constructor(
+@HiltViewModel(assistedFactory = ChannelContract.Factory::class)
+class ChannelViewModel @AssistedInject constructor(
     @ApplicationContext
     private val context: Context,
     private val electroRepository: ElectroRepository,
@@ -52,9 +51,9 @@ class ChannelViewModel @Inject constructor(
     private val uidProvider: UidProvider,
     private val client: HttpClient,
     webSocket: ElectroWebSocket,
-    savedStateHandle: SavedStateHandle
+    @Assisted
+    val route: ChannelRoute
 ) : ChannelContract.ViewModel(initialState = State()) {
-    private val route = savedStateHandle.toRoute<ChannelRoute>()
     val messenger: Messenger = BaseMessenger(
         electroRepository = electroRepository,
         scope = viewModelScope,
